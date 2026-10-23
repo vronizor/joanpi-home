@@ -95,22 +95,26 @@ function renderNow() {
   meter("temp-meter", (h.temp || 0) / 85);
 
   const power = el("power-value");
-  if (!h.power) {
+  const uv = history?.undervolt;
+  const covered = uv?.covered_since && latest.time - uv.covered_since < 47 * 3600
+    ? `since ${when(uv.covered_since)}`
+    : "in 48 h";
+  if (!h.power?.sensor) {
     power.textContent = "?";
     power.className = "value";
-    el("power-sub").textContent = "throttle flags not readable here";
-  } else if (h.power.now.length) {
-    power.textContent = "⚠ Now";
+    el("power-sub").textContent = "no undervoltage sensor found";
+  } else if (h.power.undervolt_now) {
+    power.textContent = "⚠ Low";
     power.className = "value bad";
-    el("power-sub").textContent = h.power.now.join(", ");
-  } else if (h.power.since_boot.length) {
-    power.textContent = "! Earlier";
+    el("power-sub").textContent = "undervoltage right now: check the power supply";
+  } else if (uv?.minutes) {
+    power.textContent = "! Dips";
     power.className = "value warn";
-    el("power-sub").textContent = `since boot: ${h.power.since_boot.join(", ")}`;
+    el("power-sub").textContent = `undervoltage in ${uv.minutes} min ${covered}, last ${when(uv.last)}`;
   } else {
     power.textContent = "✓ OK";
     power.className = "value ok";
-    el("power-sub").textContent = "no undervoltage or throttling since boot";
+    el("power-sub").textContent = `no undervoltage ${covered}`;
   }
   el("uptime-sub").textContent = `up ${duration(h.uptime)}`;
 

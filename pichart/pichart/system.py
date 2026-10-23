@@ -4,13 +4,7 @@ from glob import glob
 from pathlib import Path
 
 PROC = Path("/proc")
-
-THROTTLE_BITS = {
-    0: "undervoltage",
-    1: "frequency capped",
-    2: "throttled",
-    3: "soft temperature limit",
-}
+HWMON = Path("/sys/class/hwmon")
 
 
 def cpu_times(proc: Path = PROC) -> tuple[int, int]:
@@ -46,25 +40,14 @@ def temperature() -> float | None:
     return None
 
 
-def throttled() -> int | None:
-    candidates = glob("/sys/devices/platform/*firmware*/get_throttled") + glob(
-        "/sys/devices/platform/*/*firmware*/get_throttled"
-    )
-    for path in candidates:
+def undervoltage_sensor(hwmon: Path = HWMON) -> Path | None:
+    for name in sorted(hwmon.glob("hwmon*/name")):
         try:
-            return int(Path(path).read_text().strip(), 16)
-        except (OSError, ValueError):
+            if name.read_text().strip() == "rpi_volt":
+                return name.with_name("in0_lcrit_alarm")
+        except OSError:
             continue
     return None
-
-
-def decode_throttled(value: int | None) -> dict | None:
-    if value is None:
-        return None
-    return {
-        "now": [name for bit, name in THROTTLE_BITS.items() if value & (1 << bit)],
-        "since_boot": [name for bit, name in THROTTLE_BITS.items() if value & (1 << (bit + 16))],
-    }
 
 
 def netdev(path: Path) -> tuple[int, int]:
@@ -82,6 +65,39 @@ def netdev(path: Path) -> tuple[int, int]:
 def disk(path: Path) -> tuple[int, int]:
     st = os.statvfs(path)
     return st.f_bavail * st.f_frsize, st.f_blocks * st.f_frsize
+
+
+def cgroup_cpu_usec(cgroup: Path) -> int:
+    for line in (cgroup / "cpu.stat").read_text().splitlines():
+        name, value = line.split()
+        if name == "usage_usec":
+            return int(value)
+    raise ValueError(f"no usage_usec in {cgroup / 'cpu.stat'}")
+
+
+def cgroup_memory(cgroup: Path, proc: Path = PROC) -> int:
+    try:
+        memory = int((cgroup / "memory.current").read_text())
+    except FileNotFoundError:
+        return resident_memory(cgroup, proc)
+    for line in (cgroup / "memory.stat").read_text().splitlines():
+        name, value = line.split()
+        if name == "inactive_file":
+            memory -= int(value)
+    return max(memory, 0)
+
+
+def resident_memory(cgroup: Path, proc: Path = PROC) -> int:
+    total = 0
+    for pid in (cgroup / "cgroup.procs").read_text().split():
+        try:
+            for line in (proc / pid / "status").read_text().splitlines():
+                if line.startswith("VmRSS:"):
+                    total += int(line.split()[1]) * 1024
+                    break
+        except OSError:
+            continue
+    return total
 
 
 def established(port: int, proc: Path = PROC) -> set[str]:

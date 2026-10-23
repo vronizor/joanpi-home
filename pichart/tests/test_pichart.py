@@ -46,10 +46,36 @@ class DockerLogTests(unittest.TestCase):
 
 
 class SystemTests(unittest.TestCase):
-    def test_throttle_flags(self) -> None:
-        self.assertEqual(system.decode_throttled(0), {"now": [], "since_boot": []})
-        self.assertEqual(system.decode_throttled(0x50005), {"now": ["undervoltage", "throttled"], "since_boot": ["undervoltage", "throttled"]})
-        self.assertIsNone(system.decode_throttled(None))
+    def test_finds_the_rpi_volt_sensor_among_hwmon_devices(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            for i, name in enumerate(["cpu_thermal", "rp1_adc", "rpi_volt"]):
+                (Path(tmp) / f"hwmon{i}").mkdir()
+                (Path(tmp) / f"hwmon{i}" / "name").write_text(f"{name}\n")
+            self.assertEqual(system.undervoltage_sensor(Path(tmp)), Path(tmp) / "hwmon2" / "in0_lcrit_alarm")
+            (Path(tmp) / "hwmon2" / "name").write_text("other\n")
+            self.assertIsNone(system.undervoltage_sensor(Path(tmp)))
+
+    def test_cgroup_memory_uses_memory_current_minus_inactive_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cg = Path(tmp)
+            (cg / "memory.current").write_text("1000\n")
+            (cg / "memory.stat").write_text("anon 600\ninactive_file 300\nactive_file 100\n")
+            self.assertEqual(system.cgroup_memory(cg), 700)
+
+    def test_cgroup_memory_falls_back_to_resident_memory_without_memory_controller(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cg, proc = Path(tmp) / "cg", Path(tmp) / "proc"
+            cg.mkdir()
+            (cg / "cgroup.procs").write_text("10\n11\n12\n")
+            for pid, rss in (("10", "1000 kB"), ("11", "500 kB")):
+                (proc / pid).mkdir(parents=True)
+                (proc / pid / "status").write_text(f"Name: x\nVmRSS:\t   {rss}\nThreads: 1\n")
+            self.assertEqual(system.cgroup_memory(cg, proc), 1500 * 1024)
+
+    def test_cgroup_cpu_usage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "cpu.stat").write_text("usage_usec 123456\nuser_usec 100000\nsystem_usec 23456\n")
+            self.assertEqual(system.cgroup_cpu_usec(Path(tmp)), 123456)
 
     def test_established_connections_on_one_port(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -108,6 +134,25 @@ class StoreTests(unittest.TestCase):
             store.add_minute(int(now - 60), row, {})
             store.prune(now)
             self.assertEqual(store.db.execute("SELECT COUNT(*) FROM system_minute").fetchone()[0], 1)
+
+    def test_undervoltage_minutes_and_migration_of_an_old_database(self) -> None:
+        import sqlite3
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "old.sqlite"
+            old = sqlite3.connect(path)
+            old.execute("""CREATE TABLE system_minute (ts INTEGER PRIMARY KEY, cpu_avg REAL, cpu_max REAL,
+                           mem_avg REAL, mem_max REAL, temp_avg REAL, temp_max REAL, rx_bytes INTEGER, tx_bytes INTEGER)""")
+            old.execute("INSERT INTO system_minute VALUES (1799990000, 1, 1, 1, 1, 50, 50, 0, 0)")
+            old.commit()
+            old.close()
+
+            store = Store(path)
+            now = 1_800_000_000.0
+            row = {"cpu_avg": 1, "cpu_max": 1, "mem_avg": 1, "mem_max": 1, "temp_avg": 1, "temp_max": 1, "rx_bytes": 0, "tx_bytes": 0}
+            store.add_minute(1799999000, {**row, "undervolt": 3}, {})
+            store.add_minute(1799999060, {**row, "undervolt": 0}, {})
+            store.add_minute(1799999120, {**row, "undervolt": 1}, {})
+            self.assertEqual(store.history(now)["undervolt"], {"minutes": 2, "last": 1799999120, "covered_since": 1799990000})
 
     def test_log_cursor_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

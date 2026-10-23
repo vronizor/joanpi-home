@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS system_minute (
     cpu_avg REAL, cpu_max REAL,
     mem_avg REAL, mem_max REAL,
     temp_avg REAL, temp_max REAL,
-    rx_bytes INTEGER, tx_bytes INTEGER
+    rx_bytes INTEGER, tx_bytes INTEGER,
+    undervolt INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS service_minute (
     ts INTEGER,
@@ -38,13 +39,20 @@ class Store:
         with self.lock:
             self.db.execute("PRAGMA journal_mode=WAL")
             self.db.executescript(SCHEMA)
+            columns = {row[1] for row in self.db.execute("PRAGMA table_info(system_minute)")}
+            if "undervolt" not in columns:
+                self.db.execute("ALTER TABLE system_minute ADD COLUMN undervolt INTEGER NOT NULL DEFAULT 0")
+                self.db.commit()
 
     def add_minute(self, ts: int, system: dict, services: dict[str, dict]) -> None:
         with self.lock, self.db:
             self.db.execute(
-                "INSERT OR REPLACE INTO system_minute VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                """INSERT OR REPLACE INTO system_minute
+                   (ts, cpu_avg, cpu_max, mem_avg, mem_max, temp_avg, temp_max, rx_bytes, tx_bytes, undervolt)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (ts, system["cpu_avg"], system["cpu_max"], system["mem_avg"], system["mem_max"],
-                 system["temp_avg"], system["temp_max"], system["rx_bytes"], system["tx_bytes"]),
+                 system["temp_avg"], system["temp_max"], system["rx_bytes"], system["tx_bytes"],
+                 system.get("undervolt", 0)),
             )
             self.db.executemany(
                 """INSERT INTO service_minute (ts, key, cpu_avg, mem_avg) VALUES (?, ?, ?, ?)
@@ -100,6 +108,12 @@ class Store:
             rx, tx = self.db.execute(
                 "SELECT SUM(rx_bytes), SUM(tx_bytes) FROM system_minute WHERE ts >= ?", (since,)
             ).fetchone()
+            undervolt_minutes, undervolt_last = self.db.execute(
+                "SELECT COUNT(*), MAX(ts) FROM system_minute WHERE ts >= ? AND undervolt > 0", (since,)
+            ).fetchone()
+            covered_since = self.db.execute(
+                "SELECT MIN(ts) FROM system_minute WHERE ts >= ?", (since,)
+            ).fetchone()[0]
             peak = self.db.execute(
                 "SELECT ts, cpu_max FROM system_minute WHERE ts >= ? ORDER BY cpu_max DESC LIMIT 1", (since,)
             ).fetchone()
@@ -131,6 +145,7 @@ class Store:
             "hourly": hourly,
             "totals": totals,
             "network": {"rx": rx or 0, "tx": tx or 0},
+            "undervolt": {"minutes": undervolt_minutes, "last": undervolt_last, "covered_since": covered_since},
             "peak": {
                 "ts": peak[0], "cpu": peak[1],
                 "service": peak_service[0] if peak_service else None,

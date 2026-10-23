@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -46,20 +47,6 @@ def cgroup_dir(container_id: str) -> Path | None:
     return None
 
 
-def cgroup_usage(path: Path) -> tuple[int, int]:
-    usage = 0
-    for line in (path / "cpu.stat").read_text().splitlines():
-        name, value = line.split()
-        if name == "usage_usec":
-            usage = int(value)
-    memory = int((path / "memory.current").read_text())
-    for line in (path / "memory.stat").read_text().splitlines():
-        name, value = line.split()
-        if name == "inactive_file":
-            memory -= int(value)
-    return usage, max(memory, 0)
-
-
 def mean(values: list[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
@@ -87,8 +74,23 @@ class Collector:
         self.minute: int | None = None
         self.buffer = self._empty_buffer()
         self.latest: dict | None = None
+        self.undervolt_sensor = system.undervoltage_sensor()
+        self.undervolt_seconds = 0
+        self.undervolt_lock = threading.Lock()
+
+    def watch_power(self) -> None:
+        while self.undervolt_sensor:
+            try:
+                alarm = self.undervolt_sensor.read_text().strip() == "1"
+            except OSError:
+                alarm = False
+            if alarm:
+                with self.undervolt_lock:
+                    self.undervolt_seconds += 1
+            time.sleep(1)
 
     def run(self) -> None:
+        threading.Thread(target=self.watch_power, name="power", daemon=True).start()
         tick = 0
         while True:
             started = time.monotonic()
@@ -181,19 +183,27 @@ class Collector:
                 self.container_mem.pop(key, None)
                 continue
             try:
-                usage, memory = cgroup_usage(c.cgroup)
-            except (OSError, ValueError):
-                continue
-            prev = self.prev_container.get(key)
-            if prev and prev[0] == c.id and usage >= prev[1]:
-                self.container_cpu[key] = (usage - prev[1]) / 1e6 / (mono - prev[2]) / self.cores * 100
-            self.prev_container[key] = (c.id, usage, mono)
-            self.container_mem[key] = memory
-            if c.activity == "connections" and c.port:
+                usage = system.cgroup_cpu_usec(c.cgroup)
+                prev = self.prev_container.get(key)
+                if prev and prev[0] == c.id and usage >= prev[1]:
+                    self.container_cpu[key] = (usage - prev[1]) / 1e6 / (mono - prev[2]) / self.cores * 100
+                self.prev_container[key] = (c.id, usage, mono)
+            except (OSError, ValueError) as exc:
+                log.debug("cpu for %s: %s", key, exc)
+            try:
+                self.container_mem[key] = system.cgroup_memory(c.cgroup)
+            except (OSError, ValueError) as exc:
+                log.debug("memory for %s: %s", key, exc)
+
+        for key, c in self.containers.items():
+            if c.activity == "connections" and c.port and c.state == "running":
                 peers = system.established(c.port)
                 if key in self.prev_peers:
                     self.new_connections[key] = self.new_connections.get(key, 0) + len(peers - self.prev_peers[key])
                 self.prev_peers[key] = peers
+
+        with self.undervolt_lock:
+            undervolt, self.undervolt_seconds = self.undervolt_seconds, 0
 
         minute = int(now // 60 * 60)
         if self.minute is not None and minute != self.minute:
@@ -207,6 +217,7 @@ class Collector:
             b["temp"].append(temp)
         b["rx"] += rx_delta
         b["tx"] += tx_delta
+        b["undervolt"] += undervolt
         for key, value in self.container_cpu.items():
             b["services"].setdefault(key, {"cpu": [], "mem": []})["cpu"].append(value)
         for key, value in self.container_mem.items():
@@ -227,7 +238,7 @@ class Collector:
                 "swap_used": mem.get("SwapTotal", 0) - mem.get("SwapFree", 0),
                 "swap_total": mem.get("SwapTotal", 0),
                 "temp": temp,
-                "power": system.decode_throttled(system.throttled()),
+                "power": {"sensor": self.undervolt_sensor is not None, "undervolt_now": undervolt > 0},
                 "uptime": system.uptime(),
                 "disk_free": free,
                 "disk_total": size,
@@ -283,6 +294,7 @@ class Collector:
             "mem_avg": mean(b["mem"]), "mem_max": max(b["mem"]),
             "temp_avg": mean(b["temp"]), "temp_max": max(b["temp"], default=None),
             "rx_bytes": b["rx"], "tx_bytes": b["tx"],
+            "undervolt": b["undervolt"],
         }
         services = {
             key: {"cpu_avg": mean(s["cpu"]), "mem_avg": mean(s["mem"])} for key, s in b["services"].items()
@@ -353,4 +365,4 @@ class Collector:
 
     @staticmethod
     def _empty_buffer() -> dict:
-        return {"cpu": [], "mem": [], "temp": [], "rx": 0, "tx": 0, "services": {}}
+        return {"cpu": [], "mem": [], "temp": [], "rx": 0, "tx": 0, "undervolt": 0, "services": {}}

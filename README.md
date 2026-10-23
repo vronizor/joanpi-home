@@ -33,8 +33,9 @@ The collector samples every 5 seconds and the page refreshes every 5 seconds whi
 
 What it reads:
 
-- CPU, memory, swap, load, uptime and network from `/proc`; temperature and the firmware's undervoltage/throttling flags from `/sys`; free space from the filesystem `data/` lives on (the SD card).
-- Per container: state, restarts and start time from the Docker API; CPU and memory from the container's cgroup files (cheaper than `docker stats`, which keeps a stream open per container).
+- CPU, memory, swap, load, uptime and network from `/proc`; temperature from `/sys`; free space from the filesystem `data/` lives on (the SD card).
+- Undervoltage from the kernel's `rpi_volt` sensor, checked every second and kept per minute in the history. The Pi 5 has no "since boot" flag to read (the kernel driver clears it every 2 seconds), so the Power tile reports the last 48 hours instead. Thermal throttling shows as temperature.
+- Per container: state, restarts and start time from the Docker API; CPU and memory from the container's cgroup files (cheaper than `docker stats`, which keeps a stream open per container). Where the memory controller is off, as is common on Raspberry Pi OS, memory falls back to the summed resident memory of the container's processes, which counts shared libraries once per process.
 - Activity per service, set by `activity` in `services.json`:
   - `requests`: request lines counted from the container's log (uvicorn and nginx formats), `/health*` checks excluded. Pi Chart's own calls through nginx are not logged.
   - `traffic`: bytes in and out of the container's network.
