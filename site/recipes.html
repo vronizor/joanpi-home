@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Pi Recipes · JoanPi</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+@font-face {
+  font-family: "Alfa Slab One";
+  src: url("/fonts/alfa-slab-one-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Merriweather";
+  src: url("/fonts/merriweather-latin-900-italic.woff2") format("woff2");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: #ffffff; color: #000000; font-family: "Times New Roman", Times, serif; }
+a { color: #0000ee; }
+a:visited { color: #551a8b; }
+a:hover { color: #cc0000; }
+.page { max-width: 760px; margin: 0 auto; padding: 24px 16px 40px; display: flex; flex-direction: column; gap: 18px; }
+header { text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.home { font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
+h1 { margin: 0; font-size: clamp(40px, 9vw, 60px); line-height: 1; letter-spacing: -1px; color: #cc0000; text-shadow: 3px 3px 0 #c4c4c4; font-weight: 400; }
+h1 .pi { font-family: "Merriweather", Georgia, serif; font-style: italic; font-weight: 900; }
+h1 .rest { font-family: "Alfa Slab One", Georgia, serif; margin-left: 10px; }
+.tagline { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; color: #444444; }
+.toc { margin: 0; text-align: center; font-size: 16px; line-height: 1.7; }
+h2 { margin: 10px 0 0; padding: 4px 10px; background: #dcdcdc; border-top: 2px solid #808080; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
+h3 { margin: 6px 0 0; font-size: 18px; }
+p, li { font-size: 17px; line-height: 1.45; }
+p { margin: 0; }
+ul { margin: 0; padding-left: 22px; }
+.cmd { position: relative; }
+pre {
+  margin: 0;
+  padding: 8px 64px 8px 10px;
+  background: #f2f2f2;
+  border: 1px solid #a0a0a0;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 15px;
+  line-height: 1.45;
+  overflow-x: auto;
+  white-space: pre;
+}
+.copy {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  padding: 2px 8px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  color: #000000;
+  background: #d4d0c8;
+  border: 2px solid;
+  border-color: #ffffff #808080 #808080 #ffffff;
+  cursor: pointer;
+}
+.copy:active { border-color: #808080 #ffffff #ffffff #808080; }
+.note { font-size: 15px; color: #444444; }
+table { border-collapse: collapse; font-size: 16px; }
+th, td { border: 1px solid #a0a0a0; padding: 4px 10px; text-align: left; }
+th { background: #dcdcdc; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
+td code, p code, li code { font-family: "Courier New", Courier, monospace; font-size: 15px; }
+.scroll { overflow-x: auto; }
+footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; text-align: center; font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; display: flex; flex-direction: column; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+<a class="home" href="/">← JoanPi home</a>
+<h1><span class="pi">Pi</span><span class="rest">Recipes</span></h1>
+<p class="tagline">commands for joan-pi</p>
+</header>
+
+<p class="toc"><a href="#connect">Connect</a> - <a href="#services">Services &amp; ports</a> - <a href="#deploy">Deploy</a> - <a href="#docker">Docker</a> - <a href="#health">Health</a> - <a href="#network">Network</a> - <a href="#maintenance">Maintenance</a> - <a href="#adguard">AdGuard</a> - <a href="#trouble">Troubleshooting</a></p>
+
+<h2 id="connect">Connect</h2>
+<h3>From anywhere on the tailnet</h3>
+<div class="cmd"><pre>ssh baez@joan-pi</pre></div>
+<h3>From the home network</h3>
+<div class="cmd"><pre>ssh baez@192.168.0.21</pre></div>
+
+<h2 id="services">Services &amp; ports</h2>
+<p>Each service is a Docker container on <code>127.0.0.1:&lt;port&gt;</code>, given its own tailnet name with <code>tailscale serve</code>.</p>
+<div class="scroll">
+<table>
+<tr><th>Service</th><th>Address</th><th>Local port</th></tr>
+<tr><td>AdGuard Home</td><td><a href="https://adguard.tailaccc17.ts.net/">adguard</a></td><td>80</td></tr>
+<tr><td>Baby Buddy</td><td><a href="https://babybuddy.tailaccc17.ts.net/">babybuddy</a></td><td>8000</td></tr>
+<tr><td>BabyDash</td><td><a href="https://babydash.tailaccc17.ts.net/">babydash</a></td><td>8001</td></tr>
+<tr><td>Vélothèque</td><td><a href="https://velo.tailaccc17.ts.net/">velo</a></td><td>8010</td></tr>
+<tr><td>Telex</td><td><a href="https://telex.tailaccc17.ts.net/">telex</a></td><td>8020</td></tr>
+<tr><td>JoanPi home</td><td><a href="https://home.tailaccc17.ts.net/">home</a></td><td>8030</td></tr>
+<tr><td>InkBook</td><td><a href="https://inkbook.tailaccc17.ts.net/">inkbook</a></td><td>8080</td></tr>
+<tr><td>Double Feature</td><td><a href="https://doublefeature.tailaccc17.ts.net/">doublefeature</a></td><td>8090</td></tr>
+</table>
+</div>
+<p class="note">Every address is <code>https://&lt;name&gt;.tailaccc17.ts.net</code>. Pick a free port for a new service from this table.</p>
+<h3>What is being served</h3>
+<div class="cmd"><pre>tailscale serve status</pre></div>
+<h3>Add a service</h3>
+<p>Define the service with port <code>tcp:443</code> in the Tailscale admin console first, then:</p>
+<div class="cmd"><pre>sudo tailscale serve --service=svc:&lt;name&gt; --https=443 127.0.0.1:&lt;port&gt;</pre></div>
+<p class="note">Then approve the host on the admin console's Services page. Leave Funnel off.</p>
+<h3>Tailnet peers and connectivity</h3>
+<div class="cmd"><pre>tailscale status</pre></div>
+
+<h2 id="deploy">Deploy</h2>
+<h3>My apps (code in a git repo in the home folder)</h3>
+<div class="cmd"><pre>cd ~/&lt;repo&gt;
+git pull
+docker compose up -d --build</pre></div>
+<p class="note">The JoanPi homepage only needs <code>git pull</code>: its files are mounted into the container, so nothing has to be rebuilt.</p>
+<h3>Third-party images (AdGuard, Baby Buddy…)</h3>
+<div class="cmd"><pre>cd ~/docker/&lt;service&gt;
+docker compose pull
+docker compose up -d</pre></div>
+<p class="note">The container restarts on the new image; config and data in mounted volumes are untouched. Check with <code>docker ps</code> afterwards.</p>
+
+<h2 id="docker">Docker</h2>
+<h3>Running containers / all containers</h3>
+<div class="cmd"><pre>docker ps
+docker ps -a</pre></div>
+<h3>Logs</h3>
+<div class="cmd"><pre>docker logs &lt;container&gt; --tail 50
+docker logs -f &lt;container&gt;
+docker logs &lt;container&gt; --since 1h</pre></div>
+<h3>Restart a container</h3>
+<div class="cmd"><pre>docker restart &lt;container&gt;</pre></div>
+<h3>Stop and start via compose</h3>
+<div class="cmd"><pre>docker compose down
+docker compose up -d</pre></div>
+<h3>CPU and RAM per container, right now</h3>
+<div class="cmd"><pre>docker stats --no-stream</pre></div>
+<h3>Disk used by images, containers and volumes</h3>
+<div class="cmd"><pre>docker system df</pre></div>
+<h3>Remove dangling images left by rebuilds</h3>
+<div class="cmd"><pre>docker image prune</pre></div>
+<p class="note">Without <code>-a</code> this only removes untagged leftovers. With <code>-a</code> it also removes images no container uses, which then need pulling again.</p>
+
+<h2 id="health">Health</h2>
+<h3>Temperature</h3>
+<div class="cmd"><pre>vcgencmd measure_temp</pre></div>
+<h3>Undervoltage and throttling</h3>
+<div class="cmd"><pre>vcgencmd get_throttled</pre></div>
+<p class="note"><code>throttled=0x0</code> means all clear. Anything else means undervoltage or throttling happened since boot: check the power supply first, as a weak one is a common cause of SD card corruption.</p>
+<h3>Memory, disk and uptime</h3>
+<div class="cmd"><pre>free -h
+df -h
+uptime</pre></div>
+<h3>Size of each container's log file</h3>
+<div class="cmd"><pre>sudo du -h /var/lib/docker/containers/*/*-json.log | sort -h | tail</pre></div>
+<h3>System logs</h3>
+<div class="cmd"><pre>sudo journalctl -xe
+sudo journalctl -p err -b</pre></div>
+<p class="note">The second shows only errors since the last boot.</p>
+
+<h2 id="network">Network</h2>
+<h3>Current IP address</h3>
+<div class="cmd"><pre>hostname -I</pre></div>
+<h3>Detailed network info</h3>
+<div class="cmd"><pre>ip a</pre></div>
+<h3>Verify the static IP config (NetworkManager)</h3>
+<div class="cmd"><pre>nmcli connection show
+nmcli con show "YOUR_CONNECTION_NAME"</pre></div>
+<h3>Is the static IP active?</h3>
+<div class="cmd"><pre>ip a | grep wlan0 -A 3</pre></div>
+<p class="note">Look for <code>noprefixroute</code>, not <code>dynamic</code>.</p>
+
+<h2 id="maintenance">Maintenance</h2>
+<h3>Update system packages (monthly)</h3>
+<div class="cmd"><pre>sudo apt update &amp;&amp; sudo apt upgrade -y
+sudo reboot</pre></div>
+<h3>Shut down / reboot</h3>
+<div class="cmd"><pre>sudo poweroff
+sudo reboot</pre></div>
+
+<h2 id="adguard">AdGuard</h2>
+<p>Web interface: <a href="https://adguard.tailaccc17.ts.net/">adguard.tailaccc17.ts.net</a> on the tailnet, or <code>http://192.168.0.21</code> at home.</p>
+<h3>Is it running?</h3>
+<div class="cmd"><pre>docker ps | grep adguard</pre></div>
+<h3>Recent logs</h3>
+<div class="cmd"><pre>docker logs adguard --tail 50</pre></div>
+
+<h2 id="trouble">Troubleshooting</h2>
+<h3>DNS not working?</h3>
+<div class="cmd"><pre>docker ps
+docker logs adguard</pre></div>
+<h3>A tailnet address doesn't load?</h3>
+<div class="cmd"><pre>tailscale serve status
+docker ps</pre></div>
+<p class="note">If the container is up and the service is listed, check the <a href="https://login.tailscale.com/admin/machines">Tailscale admin console</a> to see that joan-pi is connected.</p>
+<h3>Pi not responding?</h3>
+<ul>
+<li>Router admin page → DHCP clients</li>
+<li>Look for <code>joan-pi</code> or <code>192.168.0.21</code></li>
+</ul>
+<h3>Lost SSH access? With a monitor and keyboard:</h3>
+<div class="cmd"><pre>ip a
+systemctl status ssh</pre></div>
+<p class="note">The first checks whether the IP changed; the second whether SSH is running.</p>
+
+<footer>
+<span><a href="/">JoanPi home</a> - <a href="https://login.tailscale.com/admin/machines">Tailscale admin</a></span>
+<span>Copyright © 2026 JoanPi. Tailnet only.</span>
+</footer>
+
+</div>
+<script>
+for (const block of document.querySelectorAll(".cmd")) {
+  const button = document.createElement("button");
+  button.className = "copy";
+  button.type = "button";
+  button.textContent = "Copy";
+  button.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(block.querySelector("pre").textContent);
+      button.textContent = "Copied";
+    } catch {
+      button.textContent = "Select it";
+    }
+    setTimeout(() => { button.textContent = "Copy"; }, 1500);
+  });
+  block.append(button);
+}
+</script>
+</body>
+</html>
