@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>JoanPi</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+@font-face {
+  font-family: "Alfa Slab One";
+  src: url("/fonts/alfa-slab-one-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Merriweather";
+  src: url("/fonts/merriweather-latin-900-italic.woff2") format("woff2");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: #ffffff;
+  color: #000000;
+  font-family: "Times New Roman", Times, serif;
+}
+a { color: #0000ee; }
+a:visited { color: #551a8b; }
+a:hover { color: #cc0000; }
+a:focus-visible { outline: 2px dotted #000000; outline-offset: 2px; }
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+header { text-align: center; }
+h1 {
+  margin: 0;
+  font-family: "Alfa Slab One", Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(52px, 11vw, 84px);
+  line-height: 1;
+  letter-spacing: -1px;
+  color: #cc0000;
+  text-shadow: 3px 3px 0 #c4c4c4;
+}
+h1 .pi {
+  margin-left: 4px;
+  font-family: "Merriweather", Georgia, serif;
+  font-style: italic;
+  font-weight: 900;
+}
+.tagline {
+  margin: 2px 0 0;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #444444;
+}
+.bubbles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 4px;
+  background: linear-gradient(#c8c8c8, #c8c8c8) no-repeat center 33px / calc(100% - 120px) 4px;
+}
+.bubble {
+  width: 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  text-align: center;
+}
+.disc {
+  position: relative;
+  width: 66px;
+  height: 66px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: #e6e6e6;
+  border: 2px solid #a8a8a8;
+  box-shadow: inset -3px -4px 0 #cdcdcd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bubble:hover .disc { border-color: #cc0000; }
+.disc img { display: block; width: 42px; height: 42px; border-radius: 9px; }
+.fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 12px;
+  color: #444444;
+}
+.disc .ext { position: relative; }
+.feature { margin: 0; text-align: center; font-size: 19px; line-height: 1.4; }
+.feature a { font-size: 22px; font-weight: bold; }
+.directory {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px 40px;
+  padding-top: 6px;
+}
+.entry { position: relative; padding-left: 34px; display: flex; flex-direction: column; gap: 3px; }
+.entry > img, .entry > .mini {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+}
+.entry .mini { box-sizing: border-box; border: 2px dashed #808080; background: #ffffff; }
+.entry .mini img { width: 100%; height: 100%; display: block; border-radius: 3px; }
+.name { font-size: 23px; font-weight: bold; }
+.sub { font-size: 16px; }
+.tag { font-size: 15px; font-weight: bold; margin-left: 6px; }
+@media (max-width: 700px) {
+  .bubbles { background: none; }
+  .bubble { width: 84px; }
+}
+footer {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #c0c0c0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  color: #444444;
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+<h1>Joan<span class="pi">Pi</span></h1>
+<p class="tagline">home on the tailnet</p>
+</header>
+
+<nav class="bubbles" aria-label="Services">
+<a class="bubble" href="https://babybuddy.tailaccc17.ts.net/">
+<span class="disc"><span class="fallback" aria-hidden="true">BB</span><img class="ext" src="https://babybuddy.tailaccc17.ts.net/apple-touch-icon.png" alt="" onerror="this.remove()"></span>
+<span>Baby Buddy</span>
+</a>
+<a class="bubble" href="https://babydash.tailaccc17.ts.net/">
+<span class="disc"><img src="/icons/babydash.svg" alt=""></span>
+<span>BabyDash</span>
+</a>
+<a class="bubble" href="https://velo.tailaccc17.ts.net/">
+<span class="disc"><img src="/icons/velo.svg" alt=""></span>
+<span>Vélothèque</span>
+</a>
+<a class="bubble" href="https://telex.tailaccc17.ts.net/">
+<span class="disc"><img src="/icons/telex.svg" alt=""></span>
+<span>Telex</span>
+</a>
+<a class="bubble" href="https://inkbook.tailaccc17.ts.net/">
+<span class="disc"><img src="/icons/inkbook.svg" alt=""></span>
+<span>InkBook</span>
+</a>
+<a class="bubble" href="https://doublefeature.tailaccc17.ts.net/">
+<span class="disc"><img src="/icons/doublefeature.svg" alt=""></span>
+<span>Double Feature</span>
+</a>
+<a class="bubble" href="https://adguard.tailaccc17.ts.net/">
+<span class="disc"><span class="fallback" aria-hidden="true">AG</span><img class="ext" src="https://adguard.tailaccc17.ts.net/assets/apple-touch-icon-180x180.png" alt="" onerror="this.remove()"></span>
+<span>AdGuard</span>
+</a>
+</nav>
+
+<p class="feature"><a href="https://babybuddy.tailaccc17.ts.net/feedings/add/">Log a feed</a> - Baby Buddy, from the couch, the cot or the kitchen</p>
+
+<nav class="directory" aria-label="Pages">
+
+<div class="entry">
+<span class="mini"><img src="https://babybuddy.tailaccc17.ts.net/apple-touch-icon.png" alt="" onerror="this.remove()"></span>
+<a class="name" href="https://babybuddy.tailaccc17.ts.net/">Baby Buddy</a>
+<span class="sub"><a href="https://babybuddy.tailaccc17.ts.net/feedings/add/">Feeding</a>, <a href="https://babybuddy.tailaccc17.ts.net/sleep/add/">Sleep</a>, <a href="https://babybuddy.tailaccc17.ts.net/changes/add/">Diaper change</a>, <a href="https://babybuddy.tailaccc17.ts.net/timeline/">Timeline</a>...</span>
+</div>
+
+<div class="entry">
+<img src="/icons/velo.svg" alt="">
+<span><a class="name" href="https://velo.tailaccc17.ts.net/">Vélothèque</a><a class="tag" href="https://velo.tailaccc17.ts.net/routes/import">[GPX!]</a></span>
+<span class="sub"><a href="https://velo.tailaccc17.ts.net/">Explore</a>, <a href="https://velo.tailaccc17.ts.net/components">Components</a>, <a href="https://velo.tailaccc17.ts.net/routes/import">Import a route</a>, <a href="https://velo.tailaccc17.ts.net/settings">Settings</a>...</span>
+</div>
+
+<div class="entry">
+<img src="/icons/babydash.svg" alt="">
+<a class="name" href="https://babydash.tailaccc17.ts.net/">BabyDash</a>
+<span class="sub">since last feed, awake for, actogram, trends</span>
+</div>
+
+<div class="entry">
+<img src="/icons/doublefeature-small.svg" alt="">
+<a class="name" href="https://doublefeature.tailaccc17.ts.net/">Double Feature</a>
+<span class="sub"><a href="https://doublefeature.tailaccc17.ts.net/#draw">Lineup</a>, <a href="https://doublefeature.tailaccc17.ts.net/#explore">Explore</a>, <a href="https://doublefeature.tailaccc17.ts.net/#lists">Lists</a>, <a href="https://doublefeature.tailaccc17.ts.net/#history">History</a>...</span>
+</div>
+
+<div class="entry">
+<img src="/icons/telex.svg" alt="">
+<a class="name" href="https://telex.tailaccc17.ts.net/">Telex</a>
+<span class="sub"><a href="https://telex.tailaccc17.ts.net/">Briefings</a>, <a href="https://telex.tailaccc17.ts.net/new">New topic</a>, <a href="https://telex.tailaccc17.ts.net/opds/">Weekly edition</a>...</span>
+</div>
+
+<div class="entry">
+<span class="mini"><img src="https://adguard.tailaccc17.ts.net/assets/apple-touch-icon-180x180.png" alt="" onerror="this.remove()"></span>
+<a class="name" href="https://adguard.tailaccc17.ts.net/">AdGuard Home</a>
+<span class="sub"><a href="https://adguard.tailaccc17.ts.net/#">Dashboard</a>, <a href="https://adguard.tailaccc17.ts.net/#logs">Query log</a>, <a href="https://adguard.tailaccc17.ts.net/#filters">Filters</a>, <a href="https://adguard.tailaccc17.ts.net/#clients">Clients</a>...</span>
+</div>
+
+<div class="entry">
+<img src="/icons/inkbook-small.svg" alt="">
+<a class="name" href="https://inkbook.tailaccc17.ts.net/">InkBook</a>
+<span class="sub"><a href="https://inkbook.tailaccc17.ts.net/">Morning Paper &amp; Library</a>, <a href="https://inkbook.tailaccc17.ts.net/opds/">OPDS catalog</a>...</span>
+</div>
+
+</nav>
+
+<footer>
+<span><a href="https://login.tailscale.com/admin/machines">Tailscale admin</a> - <a href="https://github.com/vronizor">Source code</a></span>
+<span>Copyright © 2026 JoanPi. Tailnet only.</span>
+</footer>
+
+</div>
+</body>
+</html>

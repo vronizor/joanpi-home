@@ -1,0 +1,9 @@
+services:
+  home:
+    image: nginx:1.27-alpine
+    container_name: joanpi-home
+    ports:
+      - "127.0.0.1:${APP_PORT:-8030}:80"
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+    restart: unless-stopped
