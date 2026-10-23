@@ -116,17 +116,17 @@ h1 .pi {
   gap: 24px 40px;
   padding-top: 6px;
 }
-.entry { position: relative; padding-left: 34px; display: flex; flex-direction: column; gap: 3px; }
+.entry { position: relative; padding-left: 54px; display: flex; flex-direction: column; gap: 3px; }
 .entry > img, .entry > .mini {
   position: absolute;
   left: 0;
-  top: 4px;
-  width: 24px;
-  height: 24px;
-  border-radius: 5px;
+  top: 3px;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
 }
-.entry .mini { box-sizing: border-box; border: 2px dashed #808080; background: #ffffff; }
-.entry .mini img { width: 100%; height: 100%; display: block; border-radius: 3px; }
+.entry .mini img { width: 100%; height: 100%; display: block; border-radius: 9px; }
+.entry .mini.failed { box-sizing: border-box; border: 2px dashed #808080; background: #ffffff; }
 .name { font-size: 23px; font-weight: bold; }
 .sub { font-size: 16px; }
 .tag { font-size: 15px; font-weight: bold; margin-left: 6px; }
@@ -193,7 +193,7 @@ footer {
 <nav class="directory" aria-label="Pages">
 
 <div class="entry">
-<span class="mini"><img src="https://babybuddy.tailaccc17.ts.net/apple-touch-icon.png" alt="" onerror="this.remove()"></span>
+<span class="mini"><img src="https://babybuddy.tailaccc17.ts.net/apple-touch-icon.png" alt="" onerror="this.parentNode.classList.add('failed'); this.remove()"></span>
 <a class="name" href="https://babybuddy.tailaccc17.ts.net/">Baby Buddy</a>
 <span class="sub"><a href="https://babybuddy.tailaccc17.ts.net/feedings/add/">Feeding</a>, <a href="https://babybuddy.tailaccc17.ts.net/sleep/add/">Sleep</a>, <a href="https://babybuddy.tailaccc17.ts.net/changes/add/">Diaper change</a>, <a href="https://babybuddy.tailaccc17.ts.net/timeline/">Timeline</a>...</span>
 </div>
@@ -211,7 +211,7 @@ footer {
 </div>
 
 <div class="entry">
-<img src="/icons/doublefeature-small.svg" alt="">
+<img src="/icons/doublefeature.svg" alt="">
 <a class="name" href="https://doublefeature.tailaccc17.ts.net/">Double Feature</a>
 <span class="sub"><a href="https://doublefeature.tailaccc17.ts.net/#draw">Lineup</a>, <a href="https://doublefeature.tailaccc17.ts.net/#explore">Explore</a>, <a href="https://doublefeature.tailaccc17.ts.net/#lists">Lists</a>, <a href="https://doublefeature.tailaccc17.ts.net/#history">History</a>...</span>
 </div>
@@ -223,13 +223,13 @@ footer {
 </div>
 
 <div class="entry">
-<span class="mini"><img src="https://adguard.tailaccc17.ts.net/assets/apple-touch-icon-180x180.png" alt="" onerror="this.remove()"></span>
+<span class="mini"><img src="https://adguard.tailaccc17.ts.net/assets/apple-touch-icon-180x180.png" alt="" onerror="this.parentNode.classList.add('failed'); this.remove()"></span>
 <a class="name" href="https://adguard.tailaccc17.ts.net/">AdGuard Home</a>
 <span class="sub"><a href="https://adguard.tailaccc17.ts.net/#">Dashboard</a>, <a href="https://adguard.tailaccc17.ts.net/#logs">Query log</a>, <a href="https://adguard.tailaccc17.ts.net/#filters">Filters</a>, <a href="https://adguard.tailaccc17.ts.net/#clients">Clients</a>...</span>
 </div>
 
 <div class="entry">
-<img src="/icons/inkbook-small.svg" alt="">
+<img src="/icons/inkbook.svg" alt="">
 <a class="name" href="https://inkbook.tailaccc17.ts.net/">InkBook</a>
 <span class="sub"><a href="https://inkbook.tailaccc17.ts.net/">Morning Paper &amp; Library</a>, <a href="https://inkbook.tailaccc17.ts.net/opds/">OPDS catalog</a>...</span>
 </div>
