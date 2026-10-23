@@ -102,6 +102,7 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 <tr><td>Vélothèque</td><td><a href="https://velo.tailaccc17.ts.net/">velo</a></td><td>8010</td></tr>
 <tr><td>Telex</td><td><a href="https://telex.tailaccc17.ts.net/">telex</a></td><td>8020</td></tr>
 <tr><td>JoanPi home</td><td><a href="https://home.tailaccc17.ts.net/">home</a></td><td>8030</td></tr>
+<tr><td>Pi Chart</td><td><a href="https://home.tailaccc17.ts.net/chart/">home/chart</a></td><td>8040</td></tr>
 <tr><td>InkBook</td><td><a href="https://inkbook.tailaccc17.ts.net/">inkbook</a></td><td>8080</td></tr>
 <tr><td>Double Feature</td><td><a href="https://doublefeature.tailaccc17.ts.net/">doublefeature</a></td><td>8090</td></tr>
 </table>
@@ -121,7 +122,7 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 <div class="cmd"><pre>cd ~/&lt;repo&gt;
 git pull
 docker compose up -d --build</pre></div>
-<p class="note">The JoanPi homepage only needs <code>git pull</code>: its files are mounted into the container, so nothing has to be rebuilt.</p>
+<p class="note">The JoanPi homepage and Pi Recipes only need <code>git pull</code>: their files are mounted into nginx, so nothing has to be rebuilt. Pi Chart code changes need <code>docker compose up -d --build pichart</code>.</p>
 <h3>Third-party images (AdGuard, Baby Buddy…)</h3>
 <div class="cmd"><pre>cd ~/docker/&lt;service&gt;
 docker compose pull

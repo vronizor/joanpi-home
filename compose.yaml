@@ -2,8 +2,29 @@ services:
   home:
     image: nginx:1.27-alpine
     container_name: joanpi-home
-    ports:
-      - "127.0.0.1:${APP_PORT:-8030}:80"
+    network_mode: host
+    environment:
+      HOME_PORT: ${HOME_PORT:-8030}
+      PICHART_PORT: ${PICHART_PORT:-8040}
     volumes:
       - ./site:/usr/share/nginx/html:ro
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    restart: unless-stopped
+
+  pichart:
+    build: ./pichart
+    image: pichart
+    container_name: pichart
+    network_mode: host
+    pid: host
+    cgroup: host
+    environment:
+      PICHART_PORT: ${PICHART_PORT:-8040}
+      ADGUARD_USERNAME: ${ADGUARD_USERNAME:-}
+      ADGUARD_PASSWORD: ${ADGUARD_PASSWORD:-}
+    volumes:
+      - ./pichart/services.json:/app/services.json:ro
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/host/docker-containers:ro
     restart: unless-stopped

@@ -1,0 +1,14 @@
+server {
+    listen 127.0.0.1:${HOME_PORT};
+    root /usr/share/nginx/html;
+    absolute_redirect off;
+
+    location = /chart {
+        return 301 /chart/;
+    }
+
+    location /chart/ {
+        access_log off;
+        proxy_pass http://127.0.0.1:${PICHART_PORT}/;
+    }
+}

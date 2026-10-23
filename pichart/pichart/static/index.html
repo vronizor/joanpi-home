@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Pi Chart · JoanPi</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+@font-face {
+  font-family: "Alfa Slab One";
+  src: url("/fonts/alfa-slab-one-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Merriweather";
+  src: url("/fonts/merriweather-latin-900-italic.woff2") format("woff2");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: #ffffff; color: #000000; font-family: "Times New Roman", Times, serif; }
+a { color: #0000ee; }
+a:visited { color: #551a8b; }
+a:hover { color: #cc0000; }
+.page { max-width: 960px; margin: 0 auto; padding: 24px 16px 40px; display: flex; flex-direction: column; gap: 20px; }
+.sans { font-family: Arial, Helvetica, sans-serif; }
+header { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+h1 { margin: 0; font-size: clamp(44px, 9vw, 64px); line-height: 1; letter-spacing: -1px; color: #cc0000; text-shadow: 3px 3px 0 #c4c4c4; font-weight: 400; }
+h1 .pi { font-family: "Merriweather", Georgia, serif; font-style: italic; font-weight: 900; }
+h1 .rest { margin-left: 10px; font-family: "Alfa Slab One", Georgia, serif; }
+.tagline { margin: 0; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; color: #444444; }
+.status { margin: 4px 0 0; font-size: 13px; color: #444444; }
+.status .bad { color: #a00000; font-weight: bold; }
+h2 { margin: 0; padding: 4px 10px; background: #dcdcdc; border-top: 2px solid #808080; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+@media (max-width: 520px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tile { padding: 8px; }
+  .value { font-size: 22px; }
+  .value small { font-size: 14px; }
+}
+.tile { border: 1px solid #808080; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.label { font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: bold; text-transform: uppercase; color: #444444; }
+.value { font-size: 30px; font-weight: bold; line-height: 1; }
+.value small { font-size: 18px; }
+.sub { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; }
+.meter { height: 12px; border: 1px solid #404040; background: #ffffff; display: flex; }
+.meter span { width: 0; background: repeating-linear-gradient(90deg, #0000cc 0 6px, #ffffff 6px 8px); }
+.ok { color: #006400; }
+.warn { color: #8a4b00; }
+.bad { color: #a00000; }
+.callout { margin: 0; font-size: 17px; line-height: 1.5; }
+.table-wrap { overflow-x: auto; border: 1px solid #808080; }
+.table { min-width: 820px; }
+.row { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.05fr) minmax(0, 0.7fr) minmax(0, 0.75fr) minmax(0, 0.6fr) minmax(0, 0.7fr) minmax(0, 2.4fr); overflow-wrap: anywhere; align-items: center; border-top: 1px solid #c0c0c0; font-size: 16px; }
+.row > :nth-child(2) { white-space: nowrap; }
+.row:nth-child(odd) { background: #f2f2f2; }
+.row > * { padding: 6px 8px; }
+.row.head { border-top: 0; background: #dcdcdc; font-family: Arial, Helvetica, sans-serif; font-size: 13px; font-weight: bold; }
+.name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-weight: bold; }
+.flag { font-family: Arial, Helvetica, sans-serif; font-size: 11px; font-weight: bold; color: #a00000; }
+.activity { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.activity svg { flex: none; border-bottom: 1px solid #808080; }
+.note { margin: -10px 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; }
+.legend { display: flex; flex-wrap: wrap; gap: 18px; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
+.legend span { display: flex; align-items: center; gap: 6px; }
+.swatch-line { width: 22px; height: 3px; background: #cc0000; }
+.swatch-band { width: 22px; height: 12px; background: #ffc4c4; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+figcaption { font-size: 19px; font-weight: bold; }
+figcaption span { font-weight: normal; font-size: 15px; color: #444444; }
+.chart { display: flex; gap: 8px; }
+.yaxis { width: 34px; flex: none; position: relative; height: 160px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #444444; }
+.yaxis span { position: absolute; right: 0; transform: translateY(-50%); }
+.plot { flex: 1; min-width: 0; position: relative; }
+.plot svg { display: block; width: 100%; height: 160px; border-left: 1px solid #808080; border-bottom: 1px solid #808080; touch-action: pan-y; }
+.xaxis { position: relative; height: 16px; margin-top: 4px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #444444; }
+.xaxis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.ref { position: absolute; right: 4px; top: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #404040; background: #ffffff; padding: 0 3px; }
+.tip { position: absolute; top: 6px; padding: 4px 8px; background: #ffffe1; border: 1px solid #000000; font-family: Arial, Helvetica, sans-serif; font-size: 12px; white-space: nowrap; pointer-events: none; transform: translateX(-50%); }
+.empty { font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #444444; }
+footer { margin-top: 12px; padding-top: 14px; border-top: 1px solid #c0c0c0; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+<h1><span class="pi">Pi</span><span class="rest">Chart</span></h1>
+<p class="tagline sans">the health of joan-pi</p>
+<p class="status sans"><span id="status">Waiting for the first sample…</span> · <a href="/">Back to JoanPi</a></p>
+</header>
+
+<h2>Right now</h2>
+<div class="tiles">
+<div class="tile">
+<span class="label">CPU</span>
+<span class="value" id="cpu-value">–</span>
+<span class="meter"><span id="cpu-meter"></span></span>
+<span class="sub" id="cpu-sub"></span>
+</div>
+<div class="tile">
+<span class="label">Memory</span>
+<span class="value" id="mem-value">–</span>
+<span class="meter"><span id="mem-meter"></span></span>
+<span class="sub" id="mem-sub"></span>
+</div>
+<div class="tile">
+<span class="label">Temperature</span>
+<span class="value" id="temp-value">–</span>
+<span class="meter"><span id="temp-meter"></span></span>
+<span class="sub">throttles at 80 °C</span>
+</div>
+<div class="tile">
+<span class="label">Power</span>
+<span class="value" id="power-value">–</span>
+<span class="sub" id="power-sub"></span>
+<span class="sub" id="uptime-sub"></span>
+</div>
+<div class="tile">
+<span class="label">SD card</span>
+<span class="value" id="disk-value">–</span>
+<span class="meter"><span id="disk-meter"></span></span>
+<span class="sub" id="disk-sub"></span>
+<span class="sub" id="docker-sub"></span>
+</div>
+<div class="tile">
+<span class="label">Network</span>
+<span class="value" id="net-value">–</span>
+<span class="sub" id="net-sub"></span>
+<span class="sub" id="net48-sub"></span>
+</div>
+</div>
+
+<p class="callout" id="callout"></p>
+
+<h2>Services</h2>
+<div class="table-wrap">
+<div class="table" id="services">
+<div class="row head"><span>Service</span><span>Status</span><span>Up for</span><span>Restarts</span><span>CPU</span><span>RAM</span><span>Last 48 h, per hour</span></div>
+</div>
+</div>
+<p class="note">CPU is each service's share of the whole Pi. Requests come from each app's access log, health checks excluded. Baby Buddy shows network traffic, Double Feature new connections (it shares the Pi's network), AdGuard its own DNS query count.</p>
+
+<h2>Last 48 hours</h2>
+<div class="legend">
+<span><span class="swatch-line"></span>15-minute average</span>
+<span><span class="swatch-band"></span>15-minute peak</span>
+</div>
+<figure>
+<figcaption>CPU <span>% of all cores</span></figcaption>
+<div id="chart-cpu"></div>
+</figure>
+<figure>
+<figcaption>Temperature <span>°C</span></figcaption>
+<div id="chart-temp"></div>
+</figure>
+<figure>
+<figcaption>Memory <span id="mem-caption">GB used</span></figcaption>
+<div id="chart-mem"></div>
+</figure>
+
+<footer>
+<span><a href="/">JoanPi home</a> - <a href="/recipes.html">Pi Recipes</a> - <a href="https://github.com/vronizor/joanpi-home">Source code</a></span>
+<span>Copyright © 2026 JoanPi. Tailnet only.</span>
+</footer>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>

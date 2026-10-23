@@ -1,0 +1,12 @@
+[
+  {"key": "babybuddy", "label": "Baby Buddy", "url": "https://babybuddy.tailaccc17.ts.net/", "port": 8000, "activity": "traffic", "match": {"name": "babybuddy"}},
+  {"key": "babydash", "label": "BabyDash", "url": "https://babydash.tailaccc17.ts.net/", "port": 8001, "activity": "requests", "match": {"name": "baby-dash"}},
+  {"key": "velo", "label": "Vélothèque", "url": "https://velo.tailaccc17.ts.net/", "port": 8010, "activity": "requests", "match": {"project": "velotheque", "service": "app"}},
+  {"key": "velo-db", "label": "Vélothèque database", "url": null, "port": null, "activity": "none", "match": {"project": "velotheque", "service": "db"}},
+  {"key": "telex", "label": "Telex", "url": "https://telex.tailaccc17.ts.net/", "port": 8020, "activity": "requests", "match": {"project": "telex", "service": "app"}},
+  {"key": "inkbook", "label": "InkBook", "url": "https://inkbook.tailaccc17.ts.net/", "port": 8080, "activity": "requests", "match": {"name": "inkbook-digest"}},
+  {"key": "doublefeature", "label": "Double Feature", "url": "https://doublefeature.tailaccc17.ts.net/", "port": 8090, "activity": "connections", "match": {"name": "double-feature"}},
+  {"key": "adguard", "label": "AdGuard Home", "url": "https://adguard.tailaccc17.ts.net/", "port": 80, "activity": "dns", "match": {"name": "adguard"}},
+  {"key": "home", "label": "JoanPi home", "url": "https://home.tailaccc17.ts.net/", "port": 8030, "activity": "requests", "match": {"name": "joanpi-home"}},
+  {"key": "pichart", "label": "Pi Chart", "url": "https://home.tailaccc17.ts.net/chart/", "port": 8040, "activity": "none", "match": {"name": "pichart"}}
+]
