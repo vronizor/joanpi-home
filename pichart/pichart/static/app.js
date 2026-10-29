@@ -184,6 +184,9 @@ function renderServices() {
       ? `<svg viewBox="0 0 100 24" preserveAspectRatio="none" width="120" height="24" aria-hidden="true"><path d="${sparkPath(act.series)}" fill="#0000cc"></path></svg>`
       : `<svg viewBox="0 0 100 24" width="120" height="24" aria-hidden="true"></svg>`;
     const restarts = s.restarts == null ? "–" : `${s.restarts}${s.restarts > 0 ? ' <span class="flag">[check]</span>' : ""}`;
+    const exit = s.exit
+      ? `<div class="why"><b>${esc(s.exit.text)}</b>${s.exit.finished_at ? ` · ${esc(when(s.exit.finished_at))}, ${duration(latest.time - s.exit.finished_at)} ago` : ""}${s.exit.last_line ? `<code>${esc(s.exit.last_line)}</code>` : ""}</div>`
+      : "";
     return `<div class="row">
 <span class="name">${name}${s.key === hungriestKey(services) ? ' <span class="flag">[hungriest]</span>' : ""}</span>
 <span class="${statusClass}"><b>${statusText}</b></span>
@@ -192,7 +195,7 @@ function renderServices() {
 <span>${pct(s.cpu)}</span>
 <span>${bytes(s.mem)}</span>
 <span class="activity">${spark}<span>${esc(act.text)}</span></span>
-</div>`;
+${exit}</div>`;
   });
   const table = el("services");
   table.innerHTML = table.firstElementChild.outerHTML + rows.join("");
@@ -207,6 +210,10 @@ function hungriestKey(services) {
 
 function renderCallout(services) {
   const parts = [];
+  const down = services.filter((s) => s.exit);
+  if (down.length) {
+    parts.push(`<b class="bad">Down:</b> ${down.map((s) => `${esc(s.label)} (${esc(s.exit.text)})`).join(", ")}.`);
+  }
   const key = hungriestKey(services);
   if (key) {
     const s = services.find((x) => x.key === key);

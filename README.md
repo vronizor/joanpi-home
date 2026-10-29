@@ -35,6 +35,7 @@ What it reads:
 
 - CPU, memory, swap, load, uptime and network from `/proc`; temperature from `/sys`; free space from the filesystem `data/` lives on (the SD card).
 - Undervoltage from the kernel's `rpi_volt` sensor, checked every second and kept per minute in the history. The Pi 5 has no "since boot" flag to read (the kernel driver clears it every 2 seconds), so the Power tile reports the last 48 hours instead. Thermal throttling shows as temperature.
+- For a container that is down: why it stopped (out of memory, a Docker error, or its exit code), when, and the last error-looking line of its log (the last line if none looks like an error). The log is read once per exit, so a crash loop doesn't cost a log read every refresh. Those log lines show on the page, so anything a service prints on crash is visible to the tailnet.
 - Per container: state, restarts and start time from the Docker API; CPU and memory from the container's cgroup files (cheaper than `docker stats`, which keeps a stream open per container). Where the memory controller is off, as is common on Raspberry Pi OS, memory falls back to the summed resident memory of the container's processes, which counts shared libraries once per process.
 - Activity per service, set by `activity` in `services.json`:
   - `requests`: request lines counted from the container's log (uvicorn and nginx formats), `/health*` checks excluded. Pi Chart's own calls through nginx are not logged.

@@ -11,12 +11,13 @@ from pathlib import Path
 
 from . import system
 from .config import Config
-from .docker import Docker, DockerError, count_requests, docker_df_sizes, parse_timestamp
+from .docker import Docker, DockerError, count_requests, docker_df_sizes, exit_reason, last_error_line, parse_timestamp
 from .store import WINDOW, Store
 
 log = logging.getLogger("pichart")
 
 TICK = 5
+EXIT_LOG_LINES = 30
 CGROUP = Path("/sys/fs/cgroup")
 HOST_LOGS = Path("/var/lib/docker/containers")
 
@@ -38,6 +39,7 @@ class Container:
     network_mode: str
     log_path: str
     cgroup: Path | None
+    exit: dict | None = None
 
 
 def cgroup_dir(container_id: str) -> Path | None:
@@ -71,6 +73,7 @@ class Collector:
         self.adguard: dict | None = None
         self.docker_disk: dict | None = None
         self.log_sizes: dict[str, int] = {}
+        self.exit_lines: dict[tuple[str, float | None], str | None] = {}
         self.minute: int | None = None
         self.buffer = self._empty_buffer()
         self.latest: dict | None = None
@@ -148,11 +151,27 @@ class Collector:
                 network_mode=info["HostConfig"].get("NetworkMode", ""),
                 log_path=info.get("LogPath") or "",
                 cgroup=cgroup_dir(item["Id"]),
+                exit=self._exit(item["Id"], state, bool(info["Config"].get("Tty"))),
             )
         self.containers = found
         self.port_ok = {
             key: system.port_open(c.port) for key, c in found.items() if c.port and c.state == "running"
         }
+
+    def _exit(self, container_id: str, state: dict, tty: bool) -> dict | None:
+        reason = exit_reason(state)
+        if reason is None or reason["finished_at"] is None:
+            return reason
+        key = (container_id, reason["finished_at"])
+        if key not in self.exit_lines:
+            try:
+                self.exit_lines = {k: v for k, v in self.exit_lines.items() if k[0] != container_id}
+                self.exit_lines[key] = last_error_line(self.docker.logs_tail(container_id, EXIT_LOG_LINES, tty))
+            except DockerError as exc:
+                log.warning("exit log for %s failed: %s", container_id[:12], exc)
+                return reason
+        reason["last_line"] = self.exit_lines[key]
+        return reason
 
     def sample(self) -> None:
         now = time.time()
@@ -282,6 +301,7 @@ class Collector:
             "cpu": self.container_cpu.get(key),
             "mem": self.container_mem.get(key),
             "log_bytes": self.log_sizes.get(key),
+            "exit": c.exit if c and c.state != "running" else None,
         }
 
     def flush_minute(self) -> None:

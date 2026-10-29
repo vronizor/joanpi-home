@@ -7,6 +7,10 @@ from urllib.parse import quote
 
 REQUEST_LINE = re.compile(r'"(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) (\S+) HTTP/[\d.]+" \d{3}')
 IGNORED_PATHS = ("/healthz", "/health")
+ERROR_LINE = re.compile(r"fatal|panic|error|exception|no space|denied|refused|incompatible|corrupt", re.IGNORECASE)
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+SIGNALS = {130: "interrupted", 134: "aborted", 137: "killed", 139: "crashed (segfault)", 143: "stopped"}
+LAST_LINE_CHARS = 240
 
 
 class DockerError(Exception):
@@ -58,6 +62,40 @@ class Docker:
             f"/containers/{quote(container_id)}/logs?stdout=1&stderr=1&timestamps=1&since={int(since)}"
         )
         return raw.decode("utf-8", "replace") if tty else demux(raw)
+
+    def logs_tail(self, container_id: str, lines: int, tty: bool) -> str:
+        raw = self._get(f"/containers/{quote(container_id)}/logs?stdout=1&stderr=1&tail={lines}")
+        return raw.decode("utf-8", "replace") if tty else demux(raw)
+
+
+def exit_reason(state: dict) -> dict | None:
+    if state.get("Status") == "running":
+        return None
+    finished = state.get("FinishedAt") or ""
+    finished_at = parse_timestamp(finished) if finished and not finished.startswith("0001") else None
+    code = state.get("ExitCode")
+    if state.get("OOMKilled"):
+        text = "killed: out of memory"
+    elif state.get("Error"):
+        text = state["Error"]
+    elif finished_at is None:
+        text = "never started"
+    elif code == 0:
+        text = "exited cleanly"
+    elif code in SIGNALS:
+        text = f"{SIGNALS[code]} (exit code {code})"
+    else:
+        text = f"exit code {code}"
+    return {"text": text, "code": code, "finished_at": finished_at, "last_line": None}
+
+
+def last_error_line(log: str) -> str | None:
+    lines = [ANSI.sub("", line).strip() for line in log.splitlines()]
+    lines = [line for line in lines if line]
+    if not lines:
+        return None
+    line = next((x for x in reversed(lines) if ERROR_LINE.search(x)), lines[-1])
+    return line if len(line) <= LAST_LINE_CHARS else line[:LAST_LINE_CHARS - 1] + "…"
 
 
 def demux(raw: bytes) -> str:

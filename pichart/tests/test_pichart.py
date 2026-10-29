@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pichart import system
 from pichart.config import ServiceRule
-from pichart.docker import count_requests, demux, docker_df_sizes, parse_timestamp
+from pichart.docker import count_requests, demux, docker_df_sizes, exit_reason, last_error_line, parse_timestamp
 from pichart.store import BUCKET, BUCKETS, Store
 
 
@@ -43,6 +43,41 @@ class DockerLogTests(unittest.TestCase):
     def test_docker_df_sizes_ignore_unknown_volume_sizes(self) -> None:
         df = {"LayersSize": 100, "Containers": [{"SizeRw": 5}], "Volumes": [{"UsageData": {"Size": -1}}, {"UsageData": {"Size": 7}}], "BuildCache": None}
         self.assertEqual(docker_df_sizes(df), {"images": 100, "containers": 5, "volumes": 7, "build_cache": 0})
+
+
+class ExitReasonTests(unittest.TestCase):
+    FINISHED = "2026-10-28T06:01:00.5Z"
+
+    def state(self, **kw) -> dict:
+        return {"Status": "exited", "ExitCode": 1, "OOMKilled": False, "Error": "", "FinishedAt": self.FINISHED, **kw}
+
+    def test_running_has_no_reason(self) -> None:
+        self.assertIsNone(exit_reason({"Status": "running"}))
+
+    def test_reasons_in_order_of_precedence(self) -> None:
+        self.assertEqual(exit_reason(self.state(OOMKilled=True, ExitCode=137))["text"], "killed: out of memory")
+        self.assertEqual(exit_reason(self.state(Error="error mounting volume"))["text"], "error mounting volume")
+        self.assertEqual(exit_reason(self.state(ExitCode=0))["text"], "exited cleanly")
+        self.assertEqual(exit_reason(self.state(ExitCode=137))["text"], "killed (exit code 137)")
+        self.assertEqual(exit_reason(self.state(Status="restarting"))["text"], "exit code 1")
+        self.assertEqual(exit_reason(self.state(Status="created", ExitCode=0, FinishedAt="0001-01-01T00:00:00Z"))["text"], "never started")
+
+    def test_keeps_exit_time(self) -> None:
+        self.assertEqual(exit_reason(self.state())["finished_at"], parse_timestamp(self.FINISHED))
+
+    def test_last_error_line_prefers_the_last_error_over_trailing_noise(self) -> None:
+        log = "\n".join([
+            "2026-10-28 06:00:59 UTC [1] LOG:  starting PostgreSQL 16",
+            "\x1b[31m2026-10-28 06:01:00 UTC [1] FATAL:  could not write to file: No space left on device\x1b[0m",
+            "2026-10-28 06:01:00 UTC [1] LOG:  database system is shut down",
+            "",
+        ])
+        self.assertEqual(last_error_line(log), "2026-10-28 06:01:00 UTC [1] FATAL:  could not write to file: No space left on device")
+
+    def test_last_error_line_falls_back_to_the_last_line_and_truncates(self) -> None:
+        self.assertEqual(last_error_line("one\ntwo\n"), "two")
+        self.assertIsNone(last_error_line("\n  \n"))
+        self.assertEqual(len(last_error_line("x" * 500)), 240)
 
 
 class SystemTests(unittest.TestCase):
