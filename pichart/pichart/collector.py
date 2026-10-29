@@ -160,7 +160,7 @@ class Collector:
 
     def _exit(self, container_id: str, state: dict, tty: bool) -> dict | None:
         reason = exit_reason(state)
-        if reason is None or reason["finished_at"] is None:
+        if reason is None or reason["finished_at"] is None or state.get("Error"):
             return reason
         key = (container_id, reason["finished_at"])
         if key not in self.exit_lines:

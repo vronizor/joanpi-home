@@ -7,7 +7,9 @@ from urllib.parse import quote
 
 REQUEST_LINE = re.compile(r'"(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) (\S+) HTTP/[\d.]+" \d{3}')
 IGNORED_PATHS = ("/healthz", "/health")
-ERROR_LINE = re.compile(r"fatal|panic|error|exception|no space|denied|refused|incompatible|corrupt", re.IGNORECASE)
+STRONG_LINE = re.compile(r"\b(?:FATAL|PANIC)\b|^[\w.]*(?:Error|Exception)\b|no space left|incompatible|corrupt")
+WEAK_LINE = re.compile(r"fatal|panic|error|exception|denied|refused", re.IGNORECASE)
+NOISE_LINE = re.compile(r"^\(Background on this error at:|^Traceback \(most recent call last\)|^\^+$|^~+$")
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 SIGNALS = {130: "interrupted", 134: "aborted", 137: "killed", 139: "crashed (segfault)", 143: "stopped"}
 LAST_LINE_CHARS = 240
@@ -91,10 +93,13 @@ def exit_reason(state: dict) -> dict | None:
 
 def last_error_line(log: str) -> str | None:
     lines = [ANSI.sub("", line).strip() for line in log.splitlines()]
-    lines = [line for line in lines if line]
+    lines = [line for line in lines if line and not NOISE_LINE.search(line)]
     if not lines:
         return None
-    line = next((x for x in reversed(lines) if ERROR_LINE.search(x)), lines[-1])
+    line = next(
+        (x for x in reversed(lines) if STRONG_LINE.search(x)),
+        next((x for x in reversed(lines) if WEAK_LINE.search(x)), lines[-1]),
+    )
     return line if len(line) <= LAST_LINE_CHARS else line[:LAST_LINE_CHARS - 1] + "…"
 
 

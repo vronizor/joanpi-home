@@ -74,6 +74,19 @@ class ExitReasonTests(unittest.TestCase):
         ])
         self.assertEqual(last_error_line(log), "2026-10-28 06:01:00 UTC [1] FATAL:  could not write to file: No space left on device")
 
+    def test_last_error_line_picks_the_exception_not_the_sqlalchemy_trailer(self) -> None:
+        log = "\n".join([
+            "Traceback (most recent call last):",
+            '  File "/app/x.py", line 3, in <module>',
+            "psycopg.OperationalError: connection failed: connection refused",
+            "",
+            "The above exception was the direct cause of the following exception:",
+            "sqlalchemy.exc.OperationalError: (psycopg.OperationalError) connection failed: connection refused",
+            "    Is the server running on that host and accepting TCP/IP connections?",
+            "(Background on this error at: https://sqlalche.me/e/21/e3q8)",
+        ])
+        self.assertTrue(last_error_line(log).startswith("sqlalchemy.exc.OperationalError"))
+
     def test_last_error_line_falls_back_to_the_last_line_and_truncates(self) -> None:
         self.assertEqual(last_error_line("one\ntwo\n"), "two")
         self.assertIsNone(last_error_line("\n  \n"))
