@@ -8,7 +8,7 @@ The homepage for the services on joan-pi, a late-90s portal page with a link to 
 
 ```
 site/                  homepage, Pi Recipes, icons, fonts (served by nginx as-is)
-  projects/            Pi Projects: page, projects.csv, settings.json
+  projects/            Pi Projects page; its data/ comes from a private repo, never committed here
 nginx/                 nginx config: serves site/, forwards /chart/ to Pi Chart
 pichart/               Pi Chart: collector + its page (Python, standard library only)
   services.json        which containers are which service, and how to count their activity
@@ -25,16 +25,20 @@ Baby Buddy's and AdGuard Home's icons are not copied here: the homepage loads th
 
 ## Update
 
-- Homepage or Pi Recipes: `git pull`. `site/` is mounted read-only into nginx, so nothing restarts.
+- Homepage, Pi Recipes or Pi Projects: nothing to do once `joanpi-home-pull` is installed (it pulls every 15 minutes); otherwise `git pull`. `site/` is mounted read-only into nginx, so nothing restarts.
 - Pi Chart code: `git pull && docker compose up -d --build pichart`.
 - `services.json` only: `docker compose restart pichart`.
 - Anything under `ops/`: `git pull && sudo ops/install.sh`.
 
 ## Pi Projects
 
-A static page: `site/projects/index.html` reads `projects.csv` and `settings.json` next to it and plans the projects week by week in the browser. Edit either file and `git pull` on the Pi; nothing restarts.
+A static page: `site/projects/index.html` reads `data/projects.csv` and `data/settings.json` and plans the projects week by week in the browser.
 
-`settings.json`: `eur_per_month` (lands on the 1st, carries over), `saved_eur` (money available now), `hours_per_week` (chore time, doesn't carry over), `max_active` (slots), `mode` (`skip` lets buys up to one month's budget jump the queue; `strict` keeps every purchase in rank order).
+The data is personal (budget, prices paid), so it lives in a private repo, not in this public one: `site/projects/data/` is git-ignored here apart from a placeholder. Until that repo is cloned on the Pi and mounted there, the page shows a loading error.
+
+`settings.json`: `budget_start` and `opening_eur` (the ledger's start: money on hand that day), `eur_per_month` (added on every 1st after the start, carries over), `chore_hours_per_week` and `hobby_hours_per_week` (two separate weekly budgets that don't carry over and don't cover each other), `max_active` (slots), `mode` (`skip` lets buys up to one month's budget jump the queue; `strict` keeps every purchase in rank order).
+
+Savings are a ledger: `opening_eur` + `eur_per_month` × the 1sts since `budget_start` − what bought and done projects cost (`spent_eur`, or `cost_eur` until it's filled in). Nothing needs updating by hand except statuses and prices paid.
 
 `projects.csv`, one row per project:
 
@@ -43,9 +47,10 @@ A static page: `site/projects/index.html` reads `projects.csv` and `settings.jso
 | `rank` | Priority, 1 first |
 | `id`, `name` | Short id and display name |
 | `status` | `todo`, `monitoring` (already watching listings), `bought` (paid, `work_h` is what's left), `done`, `dropped` |
-| `cost_eur` | Purchase cost |
+| `cost_eur` | Estimated cost, rounded up with shipping and small extras |
+| `spent_eur` | What was actually paid, once bought; shown against the estimate in the Ledger section |
 | `buy_h`, `work_h` | Chore hours to buy, then to install or do the work |
-| `fun_h` | Hobby hours, shown but never taken from the budget |
+| `hobby_h` | Hobby hours after buying, from the hobby budget |
 | `monitor_weeks` | Weeks of watching listings before buying (calendar time, no hours) |
 | `earliest`, `deadline` | Optional dates, `YYYY-MM-DD` |
 | `notes` | Free text; quote it if it contains commas |
@@ -84,6 +89,7 @@ Everything the Pi does on a clock runs as a systemd timer, defined in `ops/`. Ti
 | Job | When | What |
 |---|---|---|
 | `joanpi-gym-pull` | every 15 min | `git pull` in the Tally checkout |
+| `joanpi-home-pull` | every 15 min | `git pull` in this checkout, so homepage, Pi Recipes and Pi Projects edits show up on their own. Changes under `ops/` or `pichart/` still need the steps in [Update](#update) |
 | `joanpi-velo-sync` | ~02:40 | Vélothèque's Strava sync (the "Sync now" job; a rate limit just resumes next night) |
 | `joanpi-lux-backup` | 03:10 | Lux Archive's `scripts/backup.sh` (commits and pushes to its data repo) |
 | `velotheque-backup` | ~03:30 | Vélothèque's own Proton backup (its repo's `ops/`); only the status hook is added here |

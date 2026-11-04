@@ -36,7 +36,7 @@ fi
 install -d -m 755 "$lib" /var/lib/joanpi /var/lib/joanpi/jobs
 install -m 755 "$ops"/lib/job_status.py "$ops"/lib/joanpi_backup.py "$ops"/lib/velo-sync.sh "$ops"/lib/docker-prune.sh "$lib/"
 
-timers=(joanpi-velo-sync joanpi-lux-backup joanpi-gym-pull joanpi-docker-prune)
+timers=(joanpi-velo-sync joanpi-lux-backup joanpi-gym-pull joanpi-home-pull joanpi-docker-prune)
 [ "$backup" = yes ] && timers+=(joanpi-backup)
 for job in "${timers[@]}"; do
   for unit in "$job.service" "$job.timer"; do

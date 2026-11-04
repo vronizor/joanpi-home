@@ -59,6 +59,7 @@ th, td { border: 1px solid #a0a0a0; padding: 4px 8px; text-align: left; vertical
 th { background: #dcdcdc; font-family: Arial, Helvetica, sans-serif; font-size: 13px; white-space: nowrap; }
 td.num { text-align: right; white-space: nowrap; }
 td.date { white-space: nowrap; }
+#plan td:nth-child(2) { min-width: 220px; }
 .pname { font-weight: bold; }
 .pnote { font-size: 14px; color: #444444; margin-top: 2px; }
 .late { color: #cc0000; font-weight: bold; }
@@ -81,6 +82,11 @@ td.date { white-space: nowrap; }
 .legend .l-dl::before { background: #ffffff; outline: 2px solid #cc0000; outline-offset: -2px; }
 .now li { margin-bottom: 4px; }
 .error { color: #a00000; font-weight: bold; }
+.panel .ro { display: flex; flex-direction: column; gap: 3px; }
+.panel .ro b { font-size: 15px; font-family: "Times New Roman", Times, serif; padding: 3px 0; }
+.over { color: #a00000; }
+.under { color: #006600; }
+tr.total td { font-weight: bold; background: #f2f2f2; }
 footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; text-align: center; font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; display: flex; flex-direction: column; gap: 6px; }
 </style>
 </head>
@@ -94,9 +100,10 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 </header>
 
 <form class="panel" id="panel" onsubmit="return false">
+<div class="ro">Savings today <b id="balance">—</b></div>
 <label>€ per month <input type="number" id="eur_per_month" min="0" step="10"></label>
-<label>€ saved now <input type="number" id="saved_eur" min="0" step="10"></label>
-<label>Chore h / week <input type="number" id="hours_per_week" min="0" step="0.5"></label>
+<label>Chore h / week <input type="number" id="chore_hours_per_week" min="0" step="0.5"></label>
+<label>Hobby h / week <input type="number" id="hobby_hours_per_week" min="0" step="0.5"></label>
 <label>Active at once <input type="number" id="max_active" min="1" max="9" step="1"></label>
 <div class="mode">
 <label><input type="radio" name="mode" value="skip"> Small buys skip ahead</label>
@@ -125,16 +132,22 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 </div>
 <div class="scroll"><table class="gantt" id="gantt"></table></div>
 
+<h2>Ledger</h2>
+<p id="ledger-line"></p>
+<div class="scroll"><table id="ledger"></table></div>
+<p class="note" id="calibration"></p>
+
 <div id="closed"></div>
 
 <h2>How it plans</h2>
 <ul class="note">
-<li>Week by week from this Monday. Money lands on the 1st of each month and carries over; chore hours don't: an hour not used in its week is gone.</li>
-<li>Each project goes: watch listings (calendar time, no budgeted hours; it starts only once the project is next in line for money) → buy (money, then buying hours) → work (chore hours). Hobby hours, like building the radio, are listed but never taken from the budget.</li>
+<li>Savings are a ledger: the opening amount on the start date, plus the monthly budget on every 1st since, minus what each bought or done project cost (what you paid, or the estimate until you say). The plan starts from today's balance.</li>
+<li>Week by week from this Monday. Money lands on the 1st of each month and carries over. Chore and hobby hours are two separate weekly budgets; neither carries over, and neither covers the other.</li>
+<li>Each project goes: watch listings (calendar time, no hours; it starts only once the project is next in line for money) → buy (money, then chore hours to buy) → work (chore hours and hobby hours, each from its own budget).</li>
 <li>A slot is attention: watching listings, buying and working take one; saving up doesn't. Projects take free slots in rank order once their earliest date has passed, and hours go to the highest-ranked project in a slot.</li>
-<li>A project with a deadline keeps its rank until the deadline gets close: once the time it needs (saving at your monthly rate, watching, chore hours) plus 4 weeks of margin would run out, it jumps to the front.</li>
-<li><b>Small buys skip ahead</b>: a purchase of at most one month's budget can go through while a higher-ranked project is still saving; bigger ones wait their turn. <b>Strict order</b>: nothing is bought until every higher-ranked project waiting for money has been bought.</li>
-<li>Costs are estimates. The list lives in <code>projects.csv</code> next to this page, the defaults in <code>settings.json</code>; the boxes above are a what-if and aren't saved.</li>
+<li>A project with a deadline keeps its rank until the deadline gets close: once the time it needs plus 4 weeks of margin would run out, it jumps to the front.</li>
+<li><b>Small buys skip ahead</b>: a purchase of at most one month's budget can go through while a higher-ranked project is still saving; bigger ones wait their turn, and nothing skips ahead of a deadline project that is saving. <b>Strict order</b>: nothing is bought until every higher-ranked project waiting for money has been bought.</li>
+<li>Costs are rounded-up estimates including shipping and small extras. The list lives in <code>projects.csv</code> and the defaults in <code>settings.json</code>, in a private data repo; the boxes above are a what-if for the future and aren't saved.</li>
 </ul>
 
 <footer>
@@ -144,8 +157,8 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 
 </div>
 <script>
-const FIELDS = ["eur_per_month", "saved_eur", "hours_per_week", "max_active"];
-const NUMERIC = ["rank", "cost_eur", "buy_h", "work_h", "fun_h", "monitor_weeks"];
+const FIELDS = ["eur_per_month", "chore_hours_per_week", "hobby_hours_per_week", "max_active"];
+const NUMERIC = ["rank", "cost_eur", "buy_h", "work_h", "hobby_h", "monitor_weeks"];
 const STATE_ORDER = ["doing", "saving", "monitor", "held"];
 const MAX_WEEKS = 260;
 let projects = [];
@@ -180,46 +193,65 @@ function parseDate(s) {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
+function today() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
-function monday(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
-function containsFirst(d) { for (let i = 0; i < 7; i++) if (addDays(d, i).getDate() === 1) return true; return false; }
+function monday(d) { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+function firstsBetween(from, to) {
+  let n = 0;
+  for (let m = new Date(from.getFullYear(), from.getMonth() + 1, 1); m <= to; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) n++;
+  return n;
+}
 function fmtDate(d) { return d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" }) : "—"; }
 function fmtMonth(d) { return d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }); }
-function eur(n) { return "€" + Math.round(n).toLocaleString("en-GB"); }
+function eur(n) { return (n < 0 ? "−€" : "€") + Math.round(Math.abs(n)).toLocaleString("en-GB"); }
 function hrs(n) { return (Math.round(n * 10) / 10).toString().replace(/\.0$/, "") + " h"; }
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+const isSpent = (p) => p.status === "bought" || p.status === "done";
+const paidOf = (p) => (p.spent_eur !== null ? p.spent_eur : p.cost_eur);
 
-function simulate(rows, s) {
-  const start = monday(new Date());
+function ledger() {
+  const start = parseDate(defaults.budget_start) || today();
+  const months = firstsBetween(start, today());
+  const income = (Number(defaults.opening_eur) || 0) + months * (Number(defaults.eur_per_month) || 0);
+  const spent = projects.filter(isSpent).reduce((a, p) => a + paidOf(p), 0);
+  return { start, months, income, spent, balance: income - spent };
+}
+
+function simulate(rows, s, balance) {
+  const now = today();
+  const start = monday(now);
   const open = rows.filter((r) => r.status !== "done" && r.status !== "dropped").map((r) => ({
     ...r,
     phase: "wait",
-    monitorLeft: r.monitor_weeks,
+    monitorLeft: r.status === "bought" ? 0 : r.monitor_weeks,
     paid: r.status === "bought" || r.cost_eur === 0,
     buyLeft: r.status === "bought" ? 0 : r.buy_h,
     workLeft: r.work_h,
-    weeks: [], hours: [],
-    started: null, bought: null, done: null,
+    hobbyLeft: r.hobby_h,
+    weeks: [], chore: [], hobby: [],
+    started: null, bought: null, done: null, urgentFrom: null,
   }));
   const byRank = [...open].sort((a, b) => a.rank - b.rank);
   const eurPerWeek = (s.eur_per_month * 12) / 52;
   const weeksNeeded = (p) =>
     p.monitorLeft +
     (p.paid ? 0 : Math.ceil(p.cost_eur / Math.max(1, eurPerWeek))) +
-    Math.ceil((p.buyLeft + p.workLeft) / Math.max(0.5, s.hours_per_week));
+    Math.max(
+      Math.ceil((p.buyLeft + p.workLeft) / Math.max(0.5, s.chore_hours_per_week)),
+      Math.ceil(p.hobbyLeft / Math.max(0.5, s.hobby_hours_per_week)));
   const inSlot = (p) => p.phase === "monitor" || p.phase === "work" || (p.phase === "buy" && p.paid);
 
   for (const p of byRank) {
     if (p.status === "monitoring") { p.phase = "monitor"; p.started = start; }
-    if (p.status === "bought") { p.phase = p.buyLeft > 0 ? "buy" : "work"; p.started = start; }
+    if (p.status === "bought") { p.phase = "work"; p.started = start; }
   }
 
-  let pot = s.saved_eur, idle = 0, w = 0;
+  let pot = balance, idle = 0, w = 0;
   const potAtWeek = [];
   for (; w < MAX_WEEKS && byRank.some((p) => p.phase !== "done"); w++) {
     const d = addDays(start, 7 * w);
     const weekEnd = addDays(d, 6);
-    if (w > 0 && containsFirst(d)) pot += s.eur_per_month;
+    pot += firstsBetween(w === 0 ? now : addDays(d, -1), weekEnd) * s.eur_per_month;
 
     const urgent = byRank
       .filter((p) => p.deadline && p.phase !== "done" && (p.deadline - d) / 6048e5 <= weeksNeeded(p) + 4)
@@ -228,31 +260,33 @@ function simulate(rows, s) {
     const order = [...urgent, ...byRank.filter((p) => !urgent.includes(p))];
 
     let slots = byRank.filter(inSlot).length;
-    let hours = s.hours_per_week, higherSaving = false;
+    let chore = s.chore_hours_per_week, hobby = s.hobby_hours_per_week, higherSaving = false, urgentSaving = false;
+    const canSkip = (p) => s.mode === "skip" && !urgentSaving && p.cost_eur <= s.eur_per_month;
     for (const p of order) {
       if (p.phase === "done") continue;
       if (p.phase === "wait") {
         if (p.earliest && p.earliest > weekEnd) continue;
         if (p.monitorLeft > 0) {
-          const nextForMoney = !higherSaving || (s.mode === "skip" && p.cost_eur <= s.eur_per_month);
-          if (slots >= s.max_active || !nextForMoney) { if (!nextForMoney) higherSaving = true; continue; }
+          const nextForMoney = !higherSaving || canSkip(p);
+          if (!nextForMoney) { higherSaving = true; continue; }
+          if (slots >= s.max_active) continue;
           p.phase = "monitor"; p.started = d; slots++;
         } else p.phase = "buy";
       }
-      let mark = "held", used = 0;
       if (p.phase === "monitor") {
         p.weeks[w] = "monitor";
         if (--p.monitorLeft <= 0) p.phase = "buy";
         continue;
       }
       if (p.phase === "buy" && !p.paid) {
-        const mayBuy = !higherSaving || (s.mode === "skip" && p.cost_eur <= s.eur_per_month);
+        const mayBuy = !higherSaving || canSkip(p);
         if (mayBuy && pot >= p.cost_eur) {
           if (slots >= s.max_active) { p.weeks[w] = "held"; continue; }
           slots++;
           pot -= p.cost_eur; p.paid = true; p.bought = d; p.started = p.started || d;
         } else {
           higherSaving = true;
+          if (urgent.includes(p)) urgentSaving = true;
           p.weeks[w] = "saving";
           continue;
         }
@@ -261,21 +295,23 @@ function simulate(rows, s) {
         if (slots >= s.max_active) { p.weeks[w] = "held"; continue; }
         p.started = d; slots++;
       }
+      let c = 0, h = 0;
       if (p.phase === "buy") {
-        const h = Math.min(hours, p.buyLeft);
-        p.buyLeft -= h; hours -= h; used += h;
+        c = Math.min(chore, p.buyLeft);
+        p.buyLeft -= c; chore -= c;
         if (p.buyLeft <= 1e-9) p.phase = "work";
       }
       if (p.phase === "work") {
-        const h = Math.min(hours, p.workLeft);
-        p.workLeft -= h; hours -= h; used += h;
-        if (p.workLeft <= 1e-9) { p.phase = "done"; p.done = d; }
+        const cw = Math.min(chore, p.workLeft);
+        p.workLeft -= cw; chore -= cw; c += cw;
+        h = Math.min(hobby, p.hobbyLeft);
+        p.hobbyLeft -= h; hobby -= h;
+        if (p.workLeft <= 1e-9 && p.hobbyLeft <= 1e-9) { p.phase = "done"; p.done = d; }
       }
-      if (used > 0 || p.phase === "done" || p.bought === d) mark = "doing";
-      p.weeks[w] = mark;
-      p.hours[w] = used;
+      p.chore[w] = c; p.hobby[w] = h;
+      p.weeks[w] = c > 0 || h > 0 || p.phase === "done" || p.bought === d ? "doing" : "held";
     }
-    idle += hours;
+    idle += chore + hobby;
     potAtWeek[w] = pot;
   }
   return { start, order: byRank, weeks: w, idle, potAtWeek, unfinished: byRank.filter((p) => p.phase !== "done") };
@@ -293,7 +329,11 @@ function fillForm(s) {
   document.querySelector(`input[name=mode][value=${s.mode === "strict" ? "strict" : "skip"}]`).checked = true;
 }
 
-function renderNow(sim, s) {
+function hoursText(c, h) {
+  return [c ? `${hrs(c)} chore` : "", h ? `${hrs(h)} hobby` : ""].filter(Boolean).join(" + ");
+}
+
+function renderNow(sim) {
   const items = [], saving = [];
   for (const p of sim.order) {
     const st = p.weeks[0];
@@ -303,9 +343,9 @@ function renderNow(sim, s) {
     if (st === "monitor") text = `<b>${esc(p.name)}</b>: watch listings (${p.monitor_weeks} week${p.monitor_weeks === 1 ? "" : "s"} of looking).`;
     else if (st === "doing") {
       const paidNow = p.bought && p.bought.getTime() === sim.start.getTime();
-      const h = p.hours[0] || 0;
       const doneNow = p.done && p.done.getTime() === sim.start.getTime();
-      const steps = [paidNow ? `buy it (${eur(p.cost_eur)})` : "", h ? `${hrs(h)} of work` : ""].filter(Boolean).join(", then ");
+      const work = hoursText(p.chore[0] || 0, p.hobby[0] || 0);
+      const steps = [paidNow ? `buy it (${eur(p.cost_eur)})` : "", work].filter(Boolean).join(", then ");
       text = `<b>${esc(p.name)}</b>: ${steps || "carry on"}.${doneNow ? " Done this week." : ""}`;
     } else text = `<b>${esc(p.name)}</b>: waiting for a free slot or for hours this week.`;
     items.push(`<li>${text}</li>`);
@@ -321,45 +361,47 @@ function renderNow(sim, s) {
 }
 
 function renderPlan(sim) {
-  const head = "<tr><th>#</th><th>Project</th><th>Cost</th><th>Chore</th><th>Starts</th><th>Bought</th><th>Done</th></tr>";
+  const head = "<tr><th>#</th><th>Project</th><th>Cost</th><th>Chore</th><th>Hobby</th><th>Starts</th><th>Bought</th><th>Done</th></tr>";
   const body = sim.order.map((p) => {
     const chore = p.buy_h + p.work_h;
-    let done = fmtDate(p.done);
-    if (!p.done) done = `<span class="late">after ${MAX_WEEKS / 52} years</span>`;
-    let dl = "";
+    let done = p.done ? fmtDate(p.done) : `<span class="late">after ${MAX_WEEKS / 52} years</span>`;
     if (p.deadline) {
       const late = !p.done || p.done > p.deadline;
-      dl = `<div class="${late ? "late" : "ok"}">${late ? "Misses" : "Meets"} ${fmtDate(p.deadline)} deadline</div>`;
+      done += `<div class="${late ? "late" : "ok"}">${late ? "Misses" : "Meets"} ${fmtDate(p.deadline)} deadline</div>`;
     }
     const extras = [];
-    if (p.fun_h) extras.push(`+ ${hrs(p.fun_h)} hobby time`);
-    if (p.monitor_weeks) extras.push(`${p.monitor_weeks} wk watching`);
+    if (p.status === "bought") extras.push(`bought for ${eur(paidOf(p))}${p.spent_eur === null ? " (estimate)" : ""}`);
+    if (p.status === "monitoring") extras.push("watching listings now");
+    if (p.monitor_weeks && p.status !== "bought") extras.push(`${p.monitor_weeks} wk watching`);
     if (p.earliest) extras.push(`not before ${fmtDate(p.earliest)}`);
     if (p.urgentFrom && p.urgentFrom > sim.start) extras.push(`jumps the queue from ${fmtDate(p.urgentFrom)}`);
+    const bought = p.status === "bought" ? "already" : p.cost_eur ? fmtDate(p.bought) : "—";
     return `<tr>
 <td class="num">${p.rank}</td>
 <td><div class="pname">${esc(p.name)}</div>${extras.length ? `<div class="pnote">${extras.join(" · ")}</div>` : ""}${p.notes ? `<div class="pnote">${esc(p.notes)}</div>` : ""}</td>
-<td class="num">${p.cost_eur ? eur(p.cost_eur) : "—"}</td>
+<td class="num">${p.status === "bought" ? "paid" : p.cost_eur ? eur(p.cost_eur) : "—"}</td>
 <td class="num">${chore ? hrs(chore) : "—"}</td>
+<td class="num">${p.hobby_h ? hrs(p.hobby_h) : "—"}</td>
 <td class="date">${fmtDate(p.started)}</td>
-<td class="date">${p.cost_eur ? fmtDate(p.bought) : "—"}</td>
-<td class="date">${done}${dl}</td>
+<td class="date">${bought}</td>
+<td class="date">${done}</td>
 </tr>`;
   }).join("");
   document.getElementById("plan").innerHTML = head + body;
 }
 
-function renderSummary(sim, s) {
+function renderSummary(sim, s, balance) {
   const cost = sim.order.reduce((a, p) => a + (p.paid && p.status === "bought" ? 0 : p.cost_eur), 0);
-  const chore = sim.order.reduce((a, p) => a + p.buy_h + p.work_h, 0);
+  const chore = sim.order.reduce((a, p) => a + (p.status === "bought" ? 0 : p.buy_h) + p.work_h, 0);
+  const hobby = sim.order.reduce((a, p) => a + p.hobby_h, 0);
   const last = sim.order.reduce((a, p) => (p.done && (!a || p.done > a) ? p.done : a), null);
-  const parts = [
-    `Everything open costs ${eur(cost)}, about ${(Math.max(0, cost - s.saved_eur) / Math.max(1, s.eur_per_month)).toFixed(1)} months of budget, and ${hrs(chore)} of chores, ${(chore / Math.max(0.5, s.hours_per_week)).toFixed(0)} weeks of budgeted time.`,
-  ];
+  const moneyMonths = Math.max(0, cost - balance) / Math.max(1, s.eur_per_month);
+  const timeMonths = Math.max(
+    chore / Math.max(0.5, s.chore_hours_per_week),
+    hobby / Math.max(0.5, s.hobby_hours_per_week)) / 4.33;
+  const parts = [`Everything still to buy costs ${eur(cost)}, about ${moneyMonths.toFixed(1)} months of budget after today's savings. The hours: ${hrs(chore)} of chores and ${hrs(hobby)} of hobby.`];
   if (last) parts.push(`Last project done around ${fmtDate(last)}.`);
-  const moneyMonths = Math.max(0, cost - s.saved_eur) / Math.max(1, s.eur_per_month);
-  const timeMonths = chore / Math.max(0.5, s.hours_per_week) / 4.33;
-  if (moneyMonths > 1.5 * timeMonths) parts.push(`<b>Money is the bottleneck:</b> the chores alone would fit in ${timeMonths.toFixed(0)} month(s), so extra hours won't speed things up; extra euros or dropping a big buy will.`);
+  if (moneyMonths > 1.5 * timeMonths) parts.push(`<b>Money is the bottleneck:</b> the hours alone would fit in ${Math.max(1, Math.round(timeMonths))} month(s), so more time won't speed things up; more euros or dropping a big buy will.`);
   else if (timeMonths > 1.5 * moneyMonths) parts.push(`<b>Time is the bottleneck:</b> the money is there sooner than the hours.`);
   if (sim.unfinished.length) parts.push(`<span class="late">${sim.unfinished.length} project(s) never finish with these settings.</span>`);
   document.getElementById("summary").innerHTML = parts.join(" ");
@@ -388,6 +430,31 @@ function renderGantt(sim) {
   document.getElementById("gantt").innerHTML = head + body;
 }
 
+function renderLedger(L) {
+  document.getElementById("ledger-line").innerHTML =
+    `${eur(defaults.opening_eur)} on ${fmtDate(L.start)} + ${L.months} × ${eur(defaults.eur_per_month)} since = ${eur(L.income)}; spent ${eur(L.spent)}; <b>balance ${eur(L.balance)}</b>.`;
+  const rows = projects.filter(isSpent);
+  if (!rows.length) {
+    document.getElementById("ledger").innerHTML = "";
+    document.getElementById("calibration").textContent = "Nothing bought yet. Tell Claude what you paid when you buy something, and it shows up here against the estimate.";
+    return;
+  }
+  const head = "<tr><th>Project</th><th>Estimate</th><th>Paid</th><th>Difference</th></tr>";
+  const body = rows.map((p) => {
+    const known = p.spent_eur !== null;
+    const diff = known ? p.spent_eur - p.cost_eur : null;
+    return `<tr><td>${esc(p.name)}</td><td class="num">${eur(p.cost_eur)}</td><td class="num">${known ? eur(p.spent_eur) : "not entered"}</td><td class="num ${diff > 0 ? "over" : diff < 0 ? "under" : ""}">${known ? (diff > 0 ? "+" : "") + eur(diff) : "—"}</td></tr>`;
+  }).join("");
+  const known = rows.filter((p) => p.spent_eur !== null);
+  const est = known.reduce((a, p) => a + p.cost_eur, 0);
+  const paid = known.reduce((a, p) => a + p.spent_eur, 0);
+  const total = known.length ? `<tr class="total"><td>Total (${known.length} with a price)</td><td class="num">${eur(est)}</td><td class="num">${eur(paid)}</td><td class="num">${paid - est > 0 ? "+" : ""}${eur(paid - est)}</td></tr>` : "";
+  document.getElementById("ledger").innerHTML = head + body + total;
+  document.getElementById("calibration").textContent = known.length && est > 0
+    ? `So far you've paid ${Math.abs(Math.round((paid / est - 1) * 100))}% ${paid >= est ? "more" : "less"} than estimated, over ${known.length} purchase${known.length === 1 ? "" : "s"}. Too few to adjust the other estimates until there are a handful.`
+    : "";
+}
+
 function renderClosed() {
   const closed = projects.filter((p) => p.status === "done" || p.status === "dropped");
   document.getElementById("closed").innerHTML = closed.length
@@ -397,23 +464,27 @@ function renderClosed() {
 
 function render() {
   const s = settingsFromForm();
+  const L = ledger();
+  document.getElementById("balance").textContent = eur(L.balance);
   document.getElementById("mode-note").textContent = s.mode === "strict"
     ? "Strict order: nothing is bought while a higher-ranked project is still saving up."
     : `Small buys skip ahead: anything up to ${eur(s.eur_per_month)} can be bought while a higher-ranked project is still saving; bigger buys wait their turn.`;
-  const sim = simulate(projects, s);
-  renderNow(sim, s);
+  const sim = simulate(projects, s, L.balance);
+  renderNow(sim);
   renderPlan(sim);
-  renderSummary(sim, s);
+  renderSummary(sim, s, L.balance);
   renderGantt(sim);
+  renderLedger(L);
   renderClosed();
 }
 
 Promise.all([
-  fetch("projects.csv", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("projects.csv: " + r.status); return r.text(); }),
-  fetch("settings.json", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("settings.json: " + r.status); return r.json(); }),
+  fetch("data/projects.csv", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("data/projects.csv: " + r.status); return r.text(); }),
+  fetch("data/settings.json", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("data/settings.json: " + r.status); return r.json(); }),
 ]).then(([csv, settings]) => {
   projects = parseCSV(csv).map((r) => {
     for (const k of NUMERIC) r[k] = Number(r[k]) || 0;
+    r.spent_eur = r.spent_eur === "" || r.spent_eur === undefined ? null : Number(r.spent_eur);
     r.earliest = parseDate(r.earliest);
     r.deadline = parseDate(r.deadline);
     r.status = (r.status || "todo").toLowerCase();
@@ -426,7 +497,7 @@ Promise.all([
   render();
 }).catch((e) => {
   const el = document.getElementById("error");
-  el.textContent = "Couldn't load the project list (" + e.message + ").";
+  el.textContent = "Couldn't load the project list (" + e.message + "). The data comes from the private data repo mounted at site/projects/data; see the README.";
   el.hidden = false;
 });
 </script>

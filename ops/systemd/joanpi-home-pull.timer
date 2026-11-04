@@ -1,0 +1,9 @@
+[Unit]
+Description=JoanPi home: pull changes every 15 minutes
+
+[Timer]
+OnBootSec=3min
+OnCalendar=*:7/15
+
+[Install]
+WantedBy=timers.target
