@@ -1,0 +1,9 @@
+[Unit]
+Description=Pi Projects: pull data changes every 15 minutes
+
+[Timer]
+OnBootSec=4min
+OnCalendar=*:11/15
+
+[Install]
+WantedBy=timers.target

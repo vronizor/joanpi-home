@@ -1,0 +1,12 @@
+[Unit]
+Description=Pi Projects: pull data changes from the private data repo
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=@OWNER@
+WorkingDirectory=@HOME@/pi-projects-data
+ExecStart=/usr/bin/git pull --ff-only --quiet
+ExecStopPost=+/usr/bin/python3 /usr/local/lib/joanpi/job_status.py joanpi-projects-pull
+TimeoutStartSec=5min

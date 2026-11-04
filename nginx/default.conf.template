@@ -3,6 +3,10 @@ server {
     root /usr/share/nginx/html;
     absolute_redirect off;
 
+    location ~ /\. {
+        return 404;
+    }
+
     location = /chart {
         return 301 /chart/;
     }

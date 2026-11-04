@@ -8,6 +8,7 @@ services:
       PICHART_PORT: ${PICHART_PORT:-8040}
     volumes:
       - ./site:/usr/share/nginx/html:ro
+      - ${PROJECTS_DATA_DIR:-../pi-projects-data}:/usr/share/nginx/html/projects/data:ro
       - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
     restart: unless-stopped
 

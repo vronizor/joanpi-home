@@ -101,7 +101,7 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 
 <form class="panel" id="panel" onsubmit="return false">
 <div class="ro">Savings today <b id="balance">—</b></div>
-<label>€ per month <input type="number" id="eur_per_month" min="0" step="10"></label>
+<label>€ / month from now <input type="number" id="eur_per_month" min="0" step="10"></label>
 <label>Chore h / week <input type="number" id="chore_hours_per_week" min="0" step="0.5"></label>
 <label>Hobby h / week <input type="number" id="hobby_hours_per_week" min="0" step="0.5"></label>
 <label>Active at once <input type="number" id="max_active" min="1" max="9" step="1"></label>
@@ -133,7 +133,9 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 <div class="scroll"><table class="gantt" id="gantt"></table></div>
 
 <h2>Ledger</h2>
-<p id="ledger-line"></p>
+<div class="scroll"><table id="statement"></table></div>
+<p class="note" id="upcoming"></p>
+<p><b>Estimates vs paid</b></p>
 <div class="scroll"><table id="ledger"></table></div>
 <p class="note" id="calibration"></p>
 
@@ -141,13 +143,13 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 
 <h2>How it plans</h2>
 <ul class="note">
-<li>Savings are a ledger: the opening amount on the start date, plus the monthly budget on every 1st since, minus what each bought or done project cost (what you paid, or the estimate until you say). The plan starts from today's balance.</li>
+<li>Savings are a ledger. It starts from the latest balance check, adds the monthly saving rate in force on every 1st since, adds extra deposits, and subtracts other spending and every project bought since (what you paid, or the estimate until you say). The plan starts from today's balance; deposits, spending and rate changes dated in the future are counted when they land.</li>
 <li>Week by week from this Monday. Money lands on the 1st of each month and carries over. Chore and hobby hours are two separate weekly budgets; neither carries over, and neither covers the other.</li>
 <li>Each project goes: watch listings (calendar time, no hours; it starts only once the project is next in line for money) → buy (money, then chore hours to buy) → work (chore hours and hobby hours, each from its own budget).</li>
 <li>A slot is attention: watching listings, buying and working take one; saving up doesn't. Projects take free slots in rank order once their earliest date has passed, and hours go to the highest-ranked project in a slot.</li>
 <li>A project with a deadline keeps its rank until the deadline gets close: once the time it needs plus 4 weeks of margin would run out, it jumps to the front.</li>
 <li><b>Small buys skip ahead</b>: a purchase of at most one month's budget can go through while a higher-ranked project is still saving; bigger ones wait their turn, and nothing skips ahead of a deadline project that is saving. <b>Strict order</b>: nothing is bought until every higher-ranked project waiting for money has been bought.</li>
-<li>Costs are rounded-up estimates including shipping and small extras. The list lives in <code>projects.csv</code> and the defaults in <code>settings.json</code>, in a private data repo; the boxes above are a what-if for the future and aren't saved.</li>
+<li>Costs are rounded-up estimates including shipping and small extras. The list lives in <code>projects.csv</code> and the defaults in <code>settings.json</code>, in a private data repo; the boxes above are a what-if for the future and aren't saved. Changing the monthly amount replaces any planned rate change.</li>
 </ul>
 
 <footer>
@@ -162,6 +164,8 @@ const NUMERIC = ["rank", "cost_eur", "buy_h", "work_h", "hobby_h", "monitor_week
 const STATE_ORDER = ["doing", "saving", "monitor", "held"];
 const MAX_WEEKS = 260;
 let projects = [];
+let ledgerRows = [];
+let rates = [];
 let defaults = {};
 
 function parseCSV(text) {
@@ -196,10 +200,15 @@ function parseDate(s) {
 function today() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 function monday(d) { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
-function firstsBetween(from, to) {
-  let n = 0;
-  for (let m = new Date(from.getFullYear(), from.getMonth() + 1, 1); m <= to; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) n++;
-  return n;
+function firstsIn(from, to) {
+  const out = [];
+  for (let m = new Date(from.getFullYear(), from.getMonth() + 1, 1); m <= to; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) out.push(m);
+  return out;
+}
+function rateAt(d) {
+  let r = 0;
+  for (const x of rates) if (x.from <= d) r = x.eur_per_month;
+  return r;
 }
 function fmtDate(d) { return d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" }) : "—"; }
 function fmtMonth(d) { return d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }); }
@@ -210,11 +219,28 @@ const isSpent = (p) => p.status === "bought" || p.status === "done";
 const paidOf = (p) => (p.spent_eur !== null ? p.spent_eur : p.cost_eur);
 
 function ledger() {
-  const start = parseDate(defaults.budget_start) || today();
-  const months = firstsBetween(start, today());
-  const income = (Number(defaults.opening_eur) || 0) + months * (Number(defaults.eur_per_month) || 0);
-  const spent = projects.filter(isSpent).reduce((a, p) => a + paidOf(p), 0);
-  return { start, months, income, spent, balance: income - spent };
+  const now = today();
+  const checks = ledgerRows.filter((r) => r.kind === "balance" && r.date <= now).sort((a, b) => a.date - b.date);
+  const base = checks[checks.length - 1] || { date: rates.length ? addDays(rates[0].from, -1) : now, amount_eur: 0, note: "Start" };
+  const events = [];
+  const months = firstsIn(base.date, now);
+  for (const m of months) {
+    const r = rateAt(m);
+    const last = events[events.length - 1];
+    if (last && last.monthly && last.rate === r) { last.count++; last.to = m; last.amount += r; }
+    else events.push({ date: m, to: m, monthly: true, rate: r, count: 1, amount: r });
+  }
+  for (const r of ledgerRows) {
+    if (r.kind === "balance" || r.date <= base.date || r.date > now) continue;
+    events.push({ date: r.date, label: r.note || r.kind, amount: r.kind === "spend" ? -r.amount_eur : r.amount_eur });
+  }
+  for (const p of projects.filter(isSpent)) {
+    if (p.bought_on && p.bought_on <= base.date) continue;
+    events.push({ date: p.bought_on || now, label: `${p.name}${p.spent_eur === null ? " (estimate)" : ""}${p.bought_on ? "" : " (no date, counted as today)"}`, amount: -paidOf(p) });
+  }
+  events.sort((a, b) => a.date - b.date);
+  const balance = base.amount_eur + events.reduce((a, e) => a + e.amount, 0);
+  return { base, events, balance };
 }
 
 function simulate(rows, s, balance) {
@@ -251,7 +277,12 @@ function simulate(rows, s, balance) {
   for (; w < MAX_WEEKS && byRank.some((p) => p.phase !== "done"); w++) {
     const d = addDays(start, 7 * w);
     const weekEnd = addDays(d, 6);
-    pot += firstsBetween(w === 0 ? now : addDays(d, -1), weekEnd) * s.eur_per_month;
+    const from = w === 0 ? now : addDays(d, -1);
+    for (const m of firstsIn(from, weekEnd)) pot += s.rateOverride !== null ? s.rateOverride : rateAt(m);
+    for (const r of ledgerRows) {
+      if (r.kind === "balance" || r.date <= from || r.date > weekEnd) continue;
+      pot += r.kind === "spend" ? -r.amount_eur : r.amount_eur;
+    }
 
     const urgent = byRank
       .filter((p) => p.deadline && p.phase !== "done" && (p.deadline - d) / 6048e5 <= weeksNeeded(p) + 4)
@@ -322,6 +353,7 @@ function settingsFromForm() {
   for (const f of FIELDS) s[f] = Math.max(0, Number(document.getElementById(f).value) || 0);
   s.max_active = Math.max(1, Math.round(s.max_active));
   s.mode = document.querySelector("input[name=mode]:checked").value;
+  s.rateOverride = s.eur_per_month !== defaults.eur_per_month ? s.eur_per_month : null;
   return s;
 }
 function fillForm(s) {
@@ -431,8 +463,21 @@ function renderGantt(sim) {
 }
 
 function renderLedger(L) {
-  document.getElementById("ledger-line").innerHTML =
-    `${eur(defaults.opening_eur)} on ${fmtDate(L.start)} + ${L.months} × ${eur(defaults.eur_per_month)} since = ${eur(L.income)}; spent ${eur(L.spent)}; <b>balance ${eur(L.balance)}</b>.`;
+  const now = today();
+  const lines = [`<tr><td class="date">${fmtDate(L.base.date)}</td><td>Balance${L.base.note ? ": " + esc(L.base.note) : ""}</td><td class="num">${eur(L.base.amount_eur)}</td></tr>`];
+  for (const e of L.events) {
+    const label = e.monthly
+      ? `Monthly saving${e.count > 1 ? `, ${fmtMonth(e.date)} – ${fmtMonth(e.to)} (${e.count} × ${eur(e.rate)})` : ""}`
+      : esc(e.label);
+    lines.push(`<tr><td class="date">${fmtDate(e.date)}</td><td>${label}</td><td class="num ${e.amount < 0 ? "over" : ""}">${e.amount > 0 ? "+" : ""}${eur(e.amount)}</td></tr>`);
+  }
+  lines.push(`<tr class="total"><td class="date">${fmtDate(now)}</td><td>Balance today</td><td class="num">${eur(L.balance)}</td></tr>`);
+  document.getElementById("statement").innerHTML = "<tr><th>Date</th><th>Item</th><th>Amount</th></tr>" + lines.join("");
+  const ahead = [
+    ...ledgerRows.filter((r) => r.kind !== "balance" && r.date > now).map((r) => `${fmtDate(r.date)}: ${esc(r.note || r.kind)} ${r.kind === "spend" ? "−" : "+"}${eur(r.amount_eur)}`),
+    ...rates.filter((r) => r.from > now).map((r) => `from ${fmtDate(r.from)}: saving ${eur(r.eur_per_month)} a month`),
+  ];
+  document.getElementById("upcoming").innerHTML = ahead.length ? `Planned, and already counted in the plan: ${ahead.join("; ")}.` : "";
   const rows = projects.filter(isSpent);
   if (!rows.length) {
     document.getElementById("ledger").innerHTML = "";
@@ -479,18 +524,25 @@ function render() {
 }
 
 Promise.all([
+  fetch("data/ledger.csv", { cache: "no-store" }).then((r) => (r.ok ? r.text() : "date,kind,amount_eur,note\n")),
   fetch("data/projects.csv", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("data/projects.csv: " + r.status); return r.text(); }),
   fetch("data/settings.json", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("data/settings.json: " + r.status); return r.json(); }),
-]).then(([csv, settings]) => {
+]).then(([ledgerCsv, csv, settings]) => {
   projects = parseCSV(csv).map((r) => {
     for (const k of NUMERIC) r[k] = Number(r[k]) || 0;
     r.spent_eur = r.spent_eur === "" || r.spent_eur === undefined ? null : Number(r.spent_eur);
+    r.bought_on = parseDate(r.bought_on);
     r.earliest = parseDate(r.earliest);
     r.deadline = parseDate(r.deadline);
     r.status = (r.status || "todo").toLowerCase();
     return r;
   });
-  defaults = settings;
+  ledgerRows = parseCSV(ledgerCsv)
+    .map((r) => ({ date: parseDate(r.date), kind: (r.kind || "").toLowerCase(), amount_eur: Math.abs(Number(r.amount_eur) || 0), note: r.note || "" }))
+    .filter((r) => r.date && ["balance", "deposit", "spend"].includes(r.kind));
+  for (const r of ledgerRows) if (r.kind === "balance") r.amount_eur = Number(r.amount_eur);
+  rates = (settings.rates || []).map((r) => ({ from: parseDate(r.from), eur_per_month: Number(r.eur_per_month) || 0 })).filter((r) => r.from).sort((a, b) => a.from - b.from);
+  defaults = { ...settings, eur_per_month: rateAt(today()) };
   fillForm(defaults);
   document.getElementById("panel").addEventListener("input", render);
   document.getElementById("reset").addEventListener("click", () => { fillForm(defaults); render(); });

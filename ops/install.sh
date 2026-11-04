@@ -38,6 +38,11 @@ install -m 755 "$ops"/lib/job_status.py "$ops"/lib/joanpi_backup.py "$ops"/lib/v
 
 timers=(joanpi-velo-sync joanpi-lux-backup joanpi-gym-pull joanpi-home-pull joanpi-docker-prune)
 [ "$backup" = yes ] && timers+=(joanpi-backup)
+if [ -d "$OWNER_HOME/pi-projects-data/.git" ]; then
+  timers+=(joanpi-projects-pull)
+else
+  echo "skipped joanpi-projects-pull: clone the data repo to $OWNER_HOME/pi-projects-data first (README, Pi Projects)"
+fi
 for job in "${timers[@]}"; do
   for unit in "$job.service" "$job.timer"; do
     sed -e "s|@OWNER@|$OWNER|g" -e "s|@HOME@|$OWNER_HOME|g" \

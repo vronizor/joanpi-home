@@ -34,11 +34,36 @@ Baby Buddy's and AdGuard Home's icons are not copied here: the homepage loads th
 
 A static page: `site/projects/index.html` reads `data/projects.csv` and `data/settings.json` and plans the projects week by week in the browser.
 
-The data is personal (budget, prices paid), so it lives in a private repo, not in this public one: `site/projects/data/` is git-ignored here apart from a placeholder. Until that repo is cloned on the Pi and mounted there, the page shows a loading error.
+The data is personal (budget, prices paid), so it lives in the private repo `vronizor/pi-projects-data`, cloned to `~/pi-projects-data` and mounted read-only at `site/projects/data/` (git-ignored here apart from a placeholder). nginx refuses any path with a dot segment, so the clone's `.git` isn't served. `joanpi-projects-pull` pulls it every 15 minutes, like `joanpi-home-pull` does for this repo.
 
-`settings.json`: `budget_start` and `opening_eur` (the ledger's start: money on hand that day), `eur_per_month` (added on every 1st after the start, carries over), `chore_hours_per_week` and `hobby_hours_per_week` (two separate weekly budgets that don't carry over and don't cover each other), `max_active` (slots), `mode` (`skip` lets buys up to one month's budget jump the queue; `strict` keeps every purchase in rank order).
+Set it up once, on the Pi:
 
-Savings are a ledger: `opening_eur` + `eur_per_month` × the 1sts since `budget_start` − what bought and done projects cost (`spent_eur`, or `cost_eur` until it's filled in). Nothing needs updating by hand except statuses and prices paid.
+```sh
+ssh-keygen -t ed25519 -f ~/.ssh/projects_data -N "" -C joan-pi-projects-data
+cat ~/.ssh/projects_data.pub    # add on GitHub: pi-projects-data → Settings → Deploy keys, read-only
+cat >> ~/.ssh/config <<'CFG'
+
+Host github-projects-data
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/projects_data
+  IdentitiesOnly yes
+CFG
+git clone git@github-projects-data:vronizor/pi-projects-data.git ~/pi-projects-data
+cd ~/joanpi-home && git pull && sudo ops/install.sh && docker compose up -d home
+```
+
+Clone before `docker compose up`: if `~/pi-projects-data` doesn't exist, Docker creates it empty and owned by root, and the clone then fails. To keep the data elsewhere, set `PROJECTS_DATA_DIR` in `.env`.
+
+`settings.json`: `rates` (a list of `{ "from": "YYYY-MM-DD", "eur_per_month": N }`; the rate in force on each 1st is what lands that month, so a raise is a new entry, not an edit), `chore_hours_per_week` and `hobby_hours_per_week` (two separate weekly budgets that don't carry over and don't cover each other), `max_active` (slots), `mode` (`skip` lets buys up to one month's budget jump the queue; `strict` keeps every purchase in rank order).
+
+`ledger.csv` (`date,kind,amount_eur,note`) holds the money that isn't a project purchase:
+
+- `balance`: what's actually in the pot that day. The ledger restarts from the latest one; anything dated on or before it is already included.
+- `deposit`: extra money in (a gift, a sale, a month you saved more).
+- `spend`: hobby money spent on something not in the list.
+
+Savings today = latest balance + monthly rate on every 1st since + deposits − spending − projects bought since (`spent_eur`, or `cost_eur` until it's filled in, on `bought_on`; a bought project with no date counts as bought after the latest balance). Rows and rates dated in the future are counted by the plan when they land, so an expected bonus shows what it unlocks.
 
 `projects.csv`, one row per project:
 
@@ -48,7 +73,7 @@ Savings are a ledger: `opening_eur` + `eur_per_month` × the 1sts since `budget_
 | `id`, `name` | Short id and display name |
 | `status` | `todo`, `monitoring` (already watching listings), `bought` (paid, `work_h` is what's left), `done`, `dropped` |
 | `cost_eur` | Estimated cost, rounded up with shipping and small extras |
-| `spent_eur` | What was actually paid, once bought; shown against the estimate in the Ledger section |
+| `spent_eur`, `bought_on` | What was actually paid and when, once bought; shown in the Ledger section, the price against the estimate |
 | `buy_h`, `work_h` | Chore hours to buy, then to install or do the work |
 | `hobby_h` | Hobby hours after buying, from the hobby budget |
 | `monitor_weeks` | Weeks of watching listings before buying (calendar time, no hours) |
