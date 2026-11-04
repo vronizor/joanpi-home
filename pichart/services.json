@@ -10,5 +10,6 @@
   {"key": "adguard", "label": "AdGuard Home", "url": "https://adguard.tailaccc17.ts.net/", "port": 80, "activity": "dns", "match": {"name": "adguard"}},
   {"key": "home", "label": "JoanPi home", "url": "https://home.tailaccc17.ts.net/", "port": 8030, "activity": "requests", "match": {"name": "joanpi-home"}},
   {"key": "gym", "label": "Tally", "url": "https://gym.tailaccc17.ts.net/", "port": 8050, "activity": "requests", "match": {"name": "gym"}},
+  {"key": "lux", "label": "Lux Archive", "url": "https://photos.tailaccc17.ts.net/", "port": 8060, "activity": "requests", "match": {"name": "lux-archive"}},
   {"key": "pichart", "label": "Pi Chart", "url": "https://home.tailaccc17.ts.net/chart/", "port": 8040, "activity": "none", "match": {"name": "pichart"}}
 ]
