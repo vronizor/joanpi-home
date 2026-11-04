@@ -6,7 +6,7 @@
   {"key": "telex", "label": "Telex", "url": "https://telex.tailaccc17.ts.net/", "port": 8020, "activity": "requests", "match": {"project": "telex", "service": "app"}},
   {"key": "kiosk", "label": "Kiosk", "url": "https://kiosk.tailaccc17.ts.net/", "port": 8080, "activity": "requests", "match": {"name": "inkbook-digest"}},
   {"key": "doublefeature", "label": "Double Feature", "url": "https://doublefeature.tailaccc17.ts.net/", "port": 8090, "activity": "connections", "match": {"name": "double-feature"}},
-  {"key": "regularity", "label": "Regularity Conditions", "url": "https://regularity.tailaccc17.ts.net/", "port": 8095, "activity": "requests", "match": {"name": "regularity"}},
+  {"key": "regularity", "label": "Regularity Conditions", "url": "https://econ.tailaccc17.ts.net/", "port": 8095, "activity": "requests", "match": {"name": "regularity"}},
   {"key": "adguard", "label": "AdGuard Home", "url": "https://adguard.tailaccc17.ts.net/", "port": 80, "activity": "dns", "match": {"name": "adguard"}},
   {"key": "home", "label": "JoanPi home", "url": "https://home.tailaccc17.ts.net/", "port": 8030, "activity": "requests", "match": {"name": "joanpi-home"}},
   {"key": "gym", "label": "Tally", "url": "https://gym.tailaccc17.ts.net/", "port": 8050, "activity": "requests", "match": {"name": "gym"}},
