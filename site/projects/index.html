@@ -542,7 +542,8 @@ Promise.all([
     .filter((r) => r.date && ["balance", "deposit", "spend"].includes(r.kind));
   for (const r of ledgerRows) if (r.kind === "balance") r.amount_eur = Number(r.amount_eur);
   rates = (settings.rates || []).map((r) => ({ from: parseDate(r.from), eur_per_month: Number(r.eur_per_month) || 0 })).filter((r) => r.from).sort((a, b) => a.from - b.from);
-  defaults = { ...settings, eur_per_month: rateAt(today()) };
+  const t = today();
+  defaults = { ...settings, eur_per_month: rateAt(new Date(t.getFullYear(), t.getMonth() + 1, 1)) };
   fillForm(defaults);
   document.getElementById("panel").addEventListener("input", render);
   document.getElementById("reset").addEventListener("click", () => { fillForm(defaults); render(); });
