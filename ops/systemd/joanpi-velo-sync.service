@@ -1,0 +1,12 @@
+[Unit]
+Description=Vélothèque nightly Strava sync
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/joanpi/ops.env
+ExecStart=/usr/local/lib/joanpi/velo-sync.sh
+ExecStopPost=+/usr/bin/python3 /usr/local/lib/joanpi/job_status.py joanpi-velo-sync
+TimeoutStartSec=1h
+Nice=10

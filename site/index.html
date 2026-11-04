@@ -108,6 +108,8 @@ h1 .pi {
   color: #444444;
 }
 .disc .ext { position: relative; }
+.alert { margin: 0; text-align: center; font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: bold; }
+.alert a { color: #a00000; }
 .feature { margin: 0; text-align: center; font-size: 19px; line-height: 1.4; }
 .feature a { font-size: 22px; font-weight: bold; }
 .directory {
@@ -156,6 +158,8 @@ footer {
 <h1>Joan<span class="pi">Pi</span></h1>
 <p class="tagline">home on the tailnet</p>
 </header>
+
+<p class="alert" id="jobs-alert" hidden></p>
 
 <nav class="bubbles" aria-label="Services">
 <a class="bubble" href="https://babybuddy.tailaccc17.ts.net/">
@@ -278,5 +282,17 @@ footer {
 </footer>
 
 </div>
+<script>
+fetch("/chart/api/jobs", { cache: "no-store" })
+  .then((r) => (r.ok ? r.json() : null))
+  .then((d) => {
+    if (!d || !d.problems) return;
+    const n = d.problems;
+    const alert = document.getElementById("jobs-alert");
+    alert.innerHTML = `<a href="/chart/#jobs-title">● ${n} scheduled job${n === 1 ? " needs" : "s need"} a look</a>`;
+    alert.hidden = false;
+  })
+  .catch(() => {});
+</script>
 </body>
 </html>

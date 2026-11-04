@@ -186,6 +186,13 @@ nmcli con show "YOUR_CONNECTION_NAME"</pre></div>
 <h3>Update system packages (monthly)</h3>
 <div class="cmd"><pre>sudo apt update &amp;&amp; sudo apt upgrade -y
 sudo reboot</pre></div>
+<h3>Scheduled jobs (status also on <a href="/chart/#jobs-title">Pi Chart</a>)</h3>
+<div class="cmd"><pre>systemctl list-timers 'joanpi-*' 'velotheque-*'
+journalctl -u joanpi-backup -n 50
+sudo systemctl start joanpi-velo-sync
+joanpi-backup restore kiosk</pre></div>
+<h3>Update the jobs after a pull</h3>
+<div class="cmd"><pre>cd ~/joanpi-home &amp;&amp; git pull &amp;&amp; sudo ops/install.sh</pre></div>
 <h3>Shut down / reboot</h3>
 <div class="cmd"><pre>sudo poweroff
 sudo reboot</pre></div>

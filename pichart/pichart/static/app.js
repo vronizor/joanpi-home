@@ -369,12 +369,58 @@ function renderHistory() {
   if (latest) renderNow();
 }
 
-refreshNow().then(refreshHistory);
+const JOB_STATE = { ok: ["● OK", "ok"], failed: ["● Failed", "bad"], overdue: ["● Overdue", "warn"] };
+
+function ago(seconds) {
+  return seconds < 60 ? "just now" : `${duration(seconds)} ago`;
+}
+
+function took(seconds) {
+  if (seconds == null) return "";
+  return seconds < 60 ? `${seconds} s` : duration(seconds);
+}
+
+async function refreshJobs() {
+  let data;
+  try {
+    data = await getJSON("api/jobs");
+  } catch {
+    return;
+  }
+  const box = el("jobs");
+  const open = new Set([...box.querySelectorAll("details[open]")].map((d) => d.dataset.job));
+  el("jobs-title").innerHTML = `Scheduled jobs${data.problems ? ` <span class="flag">[${data.problems} need${data.problems === 1 ? "s" : ""} a look]</span>` : ""}`;
+  if (!data.jobs.length) {
+    box.innerHTML = '<p class="empty" style="padding: 6px 8px; margin: 0">No job has reported yet. Run <code>sudo ops/install.sh</code> from the joanpi-home checkout.</p>';
+    return;
+  }
+  box.innerHTML = data.jobs.map((j) => {
+    const [text, cls] = JOB_STATE[j.state];
+    const last = j.finished ? `last ${esc(when(j.finished))} (${ago(data.time - j.finished)})${j.duration_s != null ? `, took ${took(j.duration_s)}` : ""}` : "never ran";
+    const next = j.next ? ` · next ${esc(when(j.next))}` : "";
+    const lastOk = !j.ok && j.last_success ? ` · last success ${ago(data.time - j.last_success)}` : !j.ok ? " · no success recorded" : "";
+    const says = j.summary ? `<div class="meta says">${esc(j.summary)}</div>` : "";
+    const log = (j.log || []).length ? `<pre>${esc(j.log.join("\n"))}</pre>` : '<pre>(no output)</pre>';
+    return `<details class="job" data-job="${esc(j.job)}"${open.has(j.job) ? " open" : ""}><summary>
+<span class="state ${cls}">${text}</span>
+<span class="title">${esc(j.description || j.job)}</span>
+<span class="meta">${last}${next}${lastOk}</span>
+${says}</summary>${log}</details>`;
+  }).join("");
+}
+
+refreshNow().then(refreshHistory).then(refreshJobs);
 setInterval(() => document.visibilityState === "visible" && refreshNow(), NOW_EVERY);
-setInterval(() => document.visibilityState === "visible" && refreshHistory(), HISTORY_EVERY);
+setInterval(() => {
+  if (document.visibilityState === "visible") {
+    refreshHistory();
+    refreshJobs();
+  }
+}, HISTORY_EVERY);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     refreshNow();
     refreshHistory();
+    refreshJobs();
   }
 });

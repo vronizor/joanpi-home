@@ -1,0 +1,11 @@
+[Unit]
+Description=Docker housekeeping: dangling images and old build cache
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/joanpi/docker-prune.sh
+ExecStopPost=+/usr/bin/python3 /usr/local/lib/joanpi/job_status.py joanpi-docker-prune
+TimeoutStartSec=1h
+Nice=10
+IOSchedulingClass=idle

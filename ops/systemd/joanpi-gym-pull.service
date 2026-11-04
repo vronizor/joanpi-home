@@ -1,0 +1,12 @@
+[Unit]
+Description=Tally: pull routine changes from GitHub
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=@OWNER@
+WorkingDirectory=@HOME@/gym
+ExecStart=/usr/bin/git pull --ff-only --quiet
+ExecStopPost=+/usr/bin/python3 /usr/local/lib/joanpi/job_status.py joanpi-gym-pull
+TimeoutStartSec=5min

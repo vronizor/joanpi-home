@@ -26,6 +26,7 @@ Baby Buddy's and AdGuard Home's icons are not copied here: the homepage loads th
 - Homepage or Pi Recipes: `git pull`. `site/` is mounted read-only into nginx, so nothing restarts.
 - Pi Chart code: `git pull && docker compose up -d --build pichart`.
 - `services.json` only: `docker compose restart pichart`.
+- Anything under `ops/`: `git pull && sudo ops/install.sh`.
 
 ## Pi Chart
 
@@ -44,12 +45,68 @@ What it reads:
   - `dns`: AdGuard's own query and block counts (needs the credentials above).
 - Whether each service answers: a TCP connection to its local port, so the check itself never shows up as a request.
 - Docker disk use (images, volumes, build cache) and each container's log size, every 10 minutes.
+- Scheduled jobs: the status files in `/var/lib/joanpi/jobs/` (see [Scheduled jobs](#scheduled-jobs)), read on each page refresh. The homepage shows a red line when one has failed or is over an hour late.
 
 Containers are matched to services by name or by compose project and service. A container that matches nothing still appears, under its own name; a service whose container isn't found shows as "Not found", which usually means `services.json` has the wrong name.
 
 **Access:** Pi Chart runs with the host's network and process view, and mounts the Docker socket read-only. Read-only on the socket file doesn't limit what the API allows, so this container is effectively root on the Pi. It only answers GET requests, only on `127.0.0.1`, and is only reachable through the tailnet.
 
 Tests: `cd pichart && python -m unittest tests/test_pichart.py`.
+
+## Scheduled jobs
+
+Everything the Pi does on a clock runs as a systemd timer, defined in `ops/`. Timers catch up on a run missed while the Pi was off (`Persistent=true`), log to the journal, and each run ends with `ops/lib/job_status.py` writing `/var/lib/joanpi/jobs/<job>.json` for Pi Chart's Jobs panel.
+
+| Job | When | What |
+|---|---|---|
+| `joanpi-gym-pull` | every 15 min | `git pull` in the Tally checkout |
+| `joanpi-velo-sync` | ~02:40 | Vélothèque's Strava sync (the "Sync now" job; a rate limit just resumes next night) |
+| `joanpi-lux-backup` | 03:10 | Lux Archive's `scripts/backup.sh` (commits and pushes to its data repo) |
+| `velotheque-backup` | ~03:30 | Vélothèque's own Proton backup (its repo's `ops/`); only the status hook is added here |
+| `joanpi-backup` | ~04:15 | Proton Drive backup of the sources in `/etc/joanpi/backup.toml` |
+| `joanpi-docker-prune` | Sun 05:00 | dangling images and build cache unused for a week |
+
+Apps that schedule their own work (Telex pulls, Kiosk digests, Double Feature refreshes) keep showing it on their own pages.
+
+### Install or update
+
+```sh
+cd ~/joanpi-home && git pull && sudo ops/install.sh
+docker compose up -d --build pichart     # Jobs panel (mounts /var/lib/joanpi/jobs)
+```
+
+The first run creates `/etc/joanpi/ops.env` (owner, home folder, Vélothèque path) and `/etc/joanpi/backup.toml`, enables the timers and prints them. If the old crontab lines for Tally or Lux are still there, it prints the command that removes them.
+
+Run a job now: `sudo systemctl start joanpi-velo-sync`. Its log: `journalctl -u joanpi-velo-sync -n 50`.
+
+### App data backup (`joanpi-backup`)
+
+It uses Vélothèque's Proton setup (`/etc/velotheque/backup.env`: the pinned `proton-drive` CLI, the backup user and its session), so there is one Proton login on the Pi. The two backups never overlap: this one waits for Vélothèque's to finish.
+
+1. **Stage** (root): each source in `backup.toml` becomes one `.tar.gz`. SQLite databases are copied with SQLite's backup API and checked with `PRAGMA integrity_check`, never copied as live files. `*.log`, `-wal`/`-shm`/`-journal` files are skipped. A path that matches nothing fails the run, so a moved folder can't silently back up nothing.
+2. **Upload** (the backup user): a source whose content hasn't changed since its last upload, and whose archive is still on the Drive, is skipped. Others go to `Backups/joanpi/<source>/<source>-<UTC date>T<time>Z.tar.gz`. Retention per source: the newest archive of each of the last 14 days and 8 ISO weeks; older ones go to the Proton Drive trash.
+
+Deploy keys are left out on purpose: they're quicker to regenerate than to protect.
+
+**Restore test** (do it once after setup, then now and then):
+
+```sh
+joanpi-backup restore kiosk          # newest archive; or: joanpi-backup restore kiosk kiosk-2026-11-05T0415Z.tar.gz
+```
+
+It downloads the archive, unpacks it under `/var/lib/joanpi-backup/restore/<source>/` (paths mirror the Pi's, from `/`) and runs SQLite's integrity check on every database. It never touches live data. To put a source back: `docker compose stop` the app, `sudo cp -a` the unpacked folder over its data folder, start it again.
+
+`joanpi-backup now` runs the whole backup and prints its log.
+
+### Docker log size (optional, once)
+
+Docker keeps container logs forever by default. To cap them at 30 MB per container, create `/etc/docker/daemon.json` with:
+
+```json
+{ "log-driver": "json-file", "log-opts": { "max-size": "10m", "max-file": "3" } }
+```
+
+then `sudo systemctl restart docker` (this restarts every container) and recreate each stack with `docker compose up -d --force-recreate`, since the cap only applies to new containers. Pi Chart keeps working: it reads logs through the Docker API and counts rotated files in the log sizes.
 
 ## Adding a service
 

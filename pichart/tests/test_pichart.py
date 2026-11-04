@@ -4,6 +4,7 @@ from pathlib import Path
 
 from pichart import system
 from pichart.config import ServiceRule
+from pichart.jobs import read_jobs
 from pichart.docker import count_requests, demux, docker_df_sizes, exit_reason, last_error_line, parse_timestamp
 from pichart.store import BUCKET, BUCKETS, Store
 
@@ -209,6 +210,23 @@ class StoreTests(unittest.TestCase):
             store.set_log_cursor("telex", 12.5)
             store.set_log_cursor("telex", 13.5)
             self.assertEqual(store.log_cursor("telex"), 13.5)
+
+
+class JobsTests(unittest.TestCase):
+    def test_states_and_order(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "a.json").write_text('{"job": "a", "description": "Zeta", "ok": true, "next": 10000}')
+            (root / "b.json").write_text('{"job": "b", "description": "Alpha", "ok": true, "next": 1000}')
+            (root / "c.json").write_text('{"job": "c", "description": "Beta", "ok": false, "next": 10000}')
+            (root / "broken.json").write_text("{")
+            data = read_jobs(root, 5000)
+        self.assertEqual([j["job"] for j in data["jobs"]], ["c", "b", "a"])
+        self.assertEqual([j["state"] for j in data["jobs"]], ["failed", "overdue", "ok"])
+        self.assertEqual(data["problems"], 2)
+
+    def test_missing_dir_is_empty(self):
+        self.assertEqual(read_jobs(Path("/nonexistent/jobs"), 0)["jobs"], [])
 
 
 if __name__ == "__main__":

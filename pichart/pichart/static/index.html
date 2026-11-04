@@ -85,6 +85,19 @@ figcaption span { font-weight: normal; font-size: 15px; color: #444444; }
 .ref { position: absolute; right: 4px; top: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #404040; background: #ffffff; padding: 0 3px; }
 .tip { position: absolute; top: 6px; padding: 4px 8px; background: #ffffe1; border: 1px solid #000000; font-family: Arial, Helvetica, sans-serif; font-size: 12px; white-space: nowrap; pointer-events: none; transform: translateX(-50%); }
 .empty { font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #444444; }
+.jobs { border: 1px solid #808080; }
+.job { border-top: 1px solid #c0c0c0; }
+.job:first-child { border-top: 0; }
+.job:nth-child(odd) { background: #f2f2f2; }
+.job > summary { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 2px 10px; padding: 6px 8px; cursor: pointer; list-style: none; }
+.job > summary::-webkit-details-marker { display: none; }
+.job > summary > :not(.state) { grid-column: 2; }
+.job .state { grid-row: 1 / span 3; font-family: Arial, Helvetica, sans-serif; font-size: 13px; font-weight: bold; }
+.job .title { font-weight: bold; font-size: 16px; overflow-wrap: anywhere; }
+.job .meta { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; overflow-wrap: anywhere; }
+.job .meta .says { color: #000000; }
+.job pre { margin: 0 8px 8px; padding: 6px 8px; max-height: 260px; overflow: auto; background: #ffffe1; border: 1px solid #c0c0c0; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+h2 .flag { margin-left: 8px; font-size: 13px; }
 footer { margin-top: 12px; padding-top: 14px; border-top: 1px solid #c0c0c0; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; }
 </style>
 </head>
@@ -147,6 +160,10 @@ footer { margin-top: 12px; padding-top: 14px; border-top: 1px solid #c0c0c0; dis
 </div>
 </div>
 <p class="note">CPU is each service's share of the whole Pi. Requests come from each app's access log, health checks excluded. Baby Buddy shows network traffic, Double Feature new connections (it shares the Pi's network), AdGuard its own DNS query count.</p>
+
+<h2 id="jobs-title">Scheduled jobs</h2>
+<div class="jobs" id="jobs"><p class="empty">Loading…</p></div>
+<p class="note">Timers on the Pi itself (systemd), newest result of each. Tap a job for the end of its last run's output; the full log is <code>journalctl -u &lt;job&gt;</code>. A job is overdue when its next run is more than an hour late. Jobs that apps run themselves (Telex pulls, Kiosk digests, Double Feature refreshes) show on their own pages.</p>
 
 <h2>Last 48 hours</h2>
 <div class="legend">

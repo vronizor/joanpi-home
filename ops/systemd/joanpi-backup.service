@@ -1,0 +1,22 @@
+[Unit]
+Description=App data backup to Proton Drive (Baby Buddy, Kiosk, Double Feature, config)
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=@BACKUP_USER@
+Group=@BACKUP_USER@
+# "+": the stage step reads app data as root; the upload runs as the user holding the Proton session.
+ExecStartPre=+/usr/bin/python3 /usr/local/lib/joanpi/joanpi_backup.py stage
+ExecStart=/usr/bin/python3 /usr/local/lib/joanpi/joanpi_backup.py upload
+ExecStopPost=+/usr/bin/python3 /usr/local/lib/joanpi/job_status.py joanpi-backup
+TimeoutStartSec=4h
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=@VELO_STATE@ /var/lib/joanpi-backup
+UMask=0077

@@ -34,6 +34,7 @@ class Config:
     adguard_username: str
     adguard_password: str
     services: list[ServiceRule]
+    jobs_dir: Path = Path("/host/jobs")
 
 
 def load_services(path: Path) -> list[ServiceRule]:
@@ -63,4 +64,5 @@ def load() -> Config:
         adguard_username=env.get("ADGUARD_USERNAME", ""),
         adguard_password=env.get("ADGUARD_PASSWORD", ""),
         services=load_services(Path(env.get("PICHART_SERVICES", "/app/services.json"))),
+        jobs_dir=Path(env.get("PICHART_JOBS", "/host/jobs")),
     )

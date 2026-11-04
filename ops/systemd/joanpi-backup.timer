@@ -1,0 +1,10 @@
+[Unit]
+Description=Proton Drive backup of the Pi's app data, nightly
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

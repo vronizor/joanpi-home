@@ -27,4 +27,5 @@ services:
       - ./data:/data
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/host/docker-containers:ro
+      - /var/lib/joanpi/jobs:/host/jobs:ro
     restart: unless-stopped

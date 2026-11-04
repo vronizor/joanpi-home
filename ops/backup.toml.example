@@ -1,0 +1,31 @@
+# /etc/joanpi/backup.toml — what joanpi-backup sends to Proton Drive.
+# The Proton CLI, its version pin and its session are Vélothèque's (/etc/velotheque/backup.env).
+# Paths may start with ~/ (OWNER_HOME) and use globs. A path that matches nothing fails the run.
+# SQLite databases are snapshotted with SQLite's backup API, never copied while live.
+# Always skipped: *.log, *-wal, *-shm, *-journal, *.tmp, *.part
+
+remote = "/my-files/Backups/joanpi"
+keep_daily = 14
+keep_weekly = 8
+
+[[source]]
+name = "babybuddy"
+paths = ["~/docker/babybuddy/data"]
+
+[[source]]
+name = "kiosk"
+paths = ["~/inkbook-digest/data"]
+
+[[source]]
+name = "double-feature"
+paths = ["~/double-feature/data"]
+
+[[source]]
+name = "config"
+paths = [
+  "~/*/.env",
+  "~/docker/*/docker-compose.yml",
+  "~/docker/adguard/conf",
+  "/etc/joanpi",
+  "/etc/velotheque/backup.env",
+]
