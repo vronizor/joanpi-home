@@ -145,9 +145,9 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 <ul class="note">
 <li>Savings are a ledger. It starts from the latest balance check, adds the monthly saving rate in force on every 1st since, adds extra deposits, and subtracts other spending and every project bought since (what you paid, or the estimate until you say). The plan starts from today's balance; deposits, spending and rate changes dated in the future are counted when they land.</li>
 <li>Week by week from this Monday. Money lands on the 1st of each month and carries over. Chore and hobby hours are two separate weekly budgets; neither carries over, and neither covers the other.</li>
-<li>Each project goes: watch listings (calendar time, no hours; it starts only once the project is next in line for money) → buy (money, then chore hours to buy) → work (chore hours and hobby hours, each from its own budget).</li>
+<li>Each project goes: watch listings (calendar time, no hours; it starts only once the project is next in line for money and the savings will cover it by the end of the watching) → buy (money, then chore hours to buy) → work (chore hours and hobby hours, each from its own budget).</li>
 <li>A slot is attention: watching listings, buying and working take one; saving up doesn't. Projects take free slots in rank order once their earliest date has passed, and hours go to the highest-ranked project in a slot.</li>
-<li>A project with a deadline keeps its rank until the deadline gets close: once the time it needs plus 4 weeks of margin would run out, it jumps to the front.</li>
+<li>A project with a deadline keeps its rank until the deadline gets close: once the time it needs plus 4 weeks of margin would run out, it jumps to the front. The money it needs counts every unbought deadline project due on or before it, since they all draw on the same savings.</li>
 <li><b>Small buys skip ahead</b>: a purchase of at most one month's budget can go through while a higher-ranked project is still saving; bigger ones wait their turn, and nothing skips ahead of a deadline project that is saving. <b>Strict order</b>: nothing is bought until every higher-ranked project waiting for money has been bought.</li>
 <li>Costs are rounded-up estimates including shipping and small extras. The list lives in <code>projects.csv</code> and the defaults in <code>settings.json</code>, in a private data repo; the boxes above are a what-if for the future and aren't saved. Changing the monthly amount replaces any planned rate change.</li>
 </ul>
@@ -259,9 +259,12 @@ function simulate(rows, s, balance) {
   }));
   const byRank = [...open].sort((a, b) => a.rank - b.rank);
   const eurPerWeek = (s.eur_per_month * 12) / 52;
-  const weeksNeeded = (p) =>
+  const moneyAhead = (p) => byRank
+    .filter((q) => q.deadline && q.phase !== "done" && !q.paid && q.deadline <= p.deadline)
+    .reduce((a, q) => a + q.cost_eur, 0);
+  const weeksNeeded = (p, pot) =>
     p.monitorLeft +
-    (p.paid ? 0 : Math.ceil(p.cost_eur / Math.max(1, eurPerWeek))) +
+    (p.paid ? 0 : Math.ceil(Math.max(0, moneyAhead(p) - pot) / Math.max(1, eurPerWeek))) +
     Math.max(
       Math.ceil((p.buyLeft + p.workLeft) / Math.max(0.5, s.chore_hours_per_week)),
       Math.ceil(p.hobbyLeft / Math.max(0.5, s.hobby_hours_per_week)));
@@ -285,7 +288,7 @@ function simulate(rows, s, balance) {
     }
 
     const urgent = byRank
-      .filter((p) => p.deadline && p.phase !== "done" && (p.deadline - d) / 6048e5 <= weeksNeeded(p) + 4)
+      .filter((p) => p.deadline && p.phase !== "done" && (p.deadline - d) / 6048e5 <= weeksNeeded(p, pot) + 4)
       .sort((a, b) => a.deadline - b.deadline);
     for (const p of urgent) p.urgentFrom = p.urgentFrom || d;
     const order = [...urgent, ...byRank.filter((p) => !urgent.includes(p))];
@@ -300,6 +303,7 @@ function simulate(rows, s, balance) {
         if (p.monitorLeft > 0) {
           const nextForMoney = !higherSaving || canSkip(p);
           if (!nextForMoney) { higherSaving = true; continue; }
+          if (pot + eurPerWeek * p.monitorLeft < p.cost_eur) { higherSaving = true; continue; }
           if (slots >= s.max_active) continue;
           p.phase = "monitor"; p.started = d; slots++;
         } else p.phase = "buy";
