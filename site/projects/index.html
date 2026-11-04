@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Pi Projects · JoanPi</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+@font-face {
+  font-family: "Alfa Slab One";
+  src: url("/fonts/alfa-slab-one-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Merriweather";
+  src: url("/fonts/merriweather-latin-900-italic.woff2") format("woff2");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: #ffffff; color: #000000; font-family: "Times New Roman", Times, serif; }
+a { color: #0000ee; }
+a:visited { color: #551a8b; }
+a:hover { color: #cc0000; }
+.page { max-width: 860px; margin: 0 auto; padding: 24px 16px 40px; display: flex; flex-direction: column; gap: 18px; }
+header { text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.home { font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
+h1 { margin: 0; font-size: clamp(40px, 9vw, 60px); line-height: 1; letter-spacing: -1px; color: #cc0000; text-shadow: 3px 3px 0 #c4c4c4; font-weight: 400; }
+h1 .pi { font-family: "Merriweather", Georgia, serif; font-style: italic; font-weight: 900; }
+h1 .rest { font-family: "Alfa Slab One", Georgia, serif; margin-left: 10px; }
+.tagline { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; color: #444444; }
+h2 { margin: 10px 0 0; padding: 4px 10px; background: #dcdcdc; border-top: 2px solid #808080; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
+p, li { font-size: 17px; line-height: 1.45; }
+p { margin: 0; }
+ul { margin: 0; padding-left: 22px; }
+.note { font-size: 15px; color: #444444; }
+.panel {
+  display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end;
+  padding: 10px 12px; background: #d4d0c8;
+  border: 2px solid; border-color: #ffffff #808080 #808080 #ffffff;
+  font-family: Arial, Helvetica, sans-serif; font-size: 13px;
+}
+.panel label { display: flex; flex-direction: column; gap: 3px; }
+.panel input[type=number] { width: 72px; font-size: 15px; padding: 2px 4px; border: 2px inset #ffffff; }
+.panel .mode { display: flex; flex-direction: column; gap: 2px; }
+.panel .mode label { flex-direction: row; align-items: center; gap: 4px; }
+.panel button {
+  padding: 3px 10px; font: inherit; background: #d4d0c8;
+  border: 2px solid; border-color: #ffffff #808080 #808080 #ffffff; cursor: pointer;
+}
+.panel button:active { border-color: #808080 #ffffff #ffffff #808080; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 16px; }
+th, td { border: 1px solid #a0a0a0; padding: 4px 8px; text-align: left; vertical-align: top; }
+th { background: #dcdcdc; font-family: Arial, Helvetica, sans-serif; font-size: 13px; white-space: nowrap; }
+td.num { text-align: right; white-space: nowrap; }
+td.date { white-space: nowrap; }
+.pname { font-weight: bold; }
+.pnote { font-size: 14px; color: #444444; margin-top: 2px; }
+.late { color: #cc0000; font-weight: bold; }
+.ok { color: #006600; font-weight: bold; }
+.gantt { font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
+.gantt th, .gantt td { padding: 3px 4px; text-align: center; }
+.gantt td.label { text-align: left; white-space: nowrap; font-size: 13px; }
+.gantt td.cell { min-width: 30px; height: 18px; }
+.st-doing { background: #000080; color: #ffffff; }
+.st-saving { background: #ffcc00; }
+.st-monitor { background: repeating-linear-gradient(45deg, #ffffff 0 3px, #9a9a9a 3px 5px); }
+.st-held { background: #e8e8e8; }
+.dl { outline: 2px solid #cc0000; outline-offset: -2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 12px; margin-right: 5px; vertical-align: -1px; border: 1px solid #808080; }
+.legend .l-doing::before { background: #000080; }
+.legend .l-saving::before { background: #ffcc00; }
+.legend .l-monitor::before { background: repeating-linear-gradient(45deg, #ffffff 0 3px, #9a9a9a 3px 5px); }
+.legend .l-held::before { background: #e8e8e8; }
+.legend .l-dl::before { background: #ffffff; outline: 2px solid #cc0000; outline-offset: -2px; }
+.now li { margin-bottom: 4px; }
+.error { color: #a00000; font-weight: bold; }
+footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; text-align: center; font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; display: flex; flex-direction: column; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+<a class="home" href="/">← JoanPi home</a>
+<h1><span class="pi">Pi</span><span class="rest">Projects</span></h1>
+<p class="tagline">what fits, and when</p>
+</header>
+
+<form class="panel" id="panel" onsubmit="return false">
+<label>€ per month <input type="number" id="eur_per_month" min="0" step="10"></label>
+<label>€ saved now <input type="number" id="saved_eur" min="0" step="10"></label>
+<label>Chore h / week <input type="number" id="hours_per_week" min="0" step="0.5"></label>
+<label>Active at once <input type="number" id="max_active" min="1" max="9" step="1"></label>
+<div class="mode">
+<label><input type="radio" name="mode" value="skip"> Small buys skip ahead</label>
+<label><input type="radio" name="mode" value="strict"> Strict order</label>
+</div>
+<button type="button" id="reset">Reset</button>
+</form>
+<p class="note" id="mode-note"></p>
+
+<p class="error" id="error" hidden></p>
+
+<h2>This week</h2>
+<ul class="now" id="now"></ul>
+
+<h2>Plan</h2>
+<div class="scroll"><table id="plan"></table></div>
+<p class="note" id="summary"></p>
+
+<h2>Timeline</h2>
+<div class="legend">
+<span class="l-doing">Buying or working</span>
+<span class="l-saving">Saving up</span>
+<span class="l-monitor">Watching listings</span>
+<span class="l-held">Waiting for a free slot or for hours</span>
+<span class="l-dl">Deadline</span>
+</div>
+<div class="scroll"><table class="gantt" id="gantt"></table></div>
+
+<div id="closed"></div>
+
+<h2>How it plans</h2>
+<ul class="note">
+<li>Week by week from this Monday. Money lands on the 1st of each month and carries over; chore hours don't: an hour not used in its week is gone.</li>
+<li>Each project goes: watch listings (calendar time, no budgeted hours; it starts only once the project is next in line for money) → buy (money, then buying hours) → work (chore hours). Hobby hours, like building the radio, are listed but never taken from the budget.</li>
+<li>A slot is attention: watching listings, buying and working take one; saving up doesn't. Projects take free slots in rank order once their earliest date has passed, and hours go to the highest-ranked project in a slot.</li>
+<li>A project with a deadline keeps its rank until the deadline gets close: once the time it needs (saving at your monthly rate, watching, chore hours) plus 4 weeks of margin would run out, it jumps to the front.</li>
+<li><b>Small buys skip ahead</b>: a purchase of at most one month's budget can go through while a higher-ranked project is still saving; bigger ones wait their turn. <b>Strict order</b>: nothing is bought until every higher-ranked project waiting for money has been bought.</li>
+<li>Costs are estimates. The list lives in <code>projects.csv</code> next to this page, the defaults in <code>settings.json</code>; the boxes above are a what-if and aren't saved.</li>
+</ul>
+
+<footer>
+<span><a href="/">JoanPi home</a> - <a href="/recipes.html">Pi Recipes</a> - <a href="/chart/">Pi Chart</a></span>
+<span>Copyright © 2026 JoanPi. Tailnet only.</span>
+</footer>
+
+</div>
+<script>
+const FIELDS = ["eur_per_month", "saved_eur", "hours_per_week", "max_active"];
+const NUMERIC = ["rank", "cost_eur", "buy_h", "work_h", "fun_h", "monitor_weeks"];
+const STATE_ORDER = ["doing", "saving", "monitor", "held"];
+const MAX_WEEKS = 260;
+let projects = [];
+let defaults = {};
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') quoted = false;
+      else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      if (row.some((v) => v !== "")) rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  row.push(field);
+  if (row.some((v) => v !== "")) rows.push(row);
+  const [head, ...body] = rows;
+  return body.map((r) => Object.fromEntries(head.map((h, i) => [h.trim(), (r[i] || "").trim()])));
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function monday(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+function containsFirst(d) { for (let i = 0; i < 7; i++) if (addDays(d, i).getDate() === 1) return true; return false; }
+function fmtDate(d) { return d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" }) : "—"; }
+function fmtMonth(d) { return d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }); }
+function eur(n) { return "€" + Math.round(n).toLocaleString("en-GB"); }
+function hrs(n) { return (Math.round(n * 10) / 10).toString().replace(/\.0$/, "") + " h"; }
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+
+function simulate(rows, s) {
+  const start = monday(new Date());
+  const open = rows.filter((r) => r.status !== "done" && r.status !== "dropped").map((r) => ({
+    ...r,
+    phase: "wait",
+    monitorLeft: r.monitor_weeks,
+    paid: r.status === "bought" || r.cost_eur === 0,
+    buyLeft: r.status === "bought" ? 0 : r.buy_h,
+    workLeft: r.work_h,
+    weeks: [], hours: [],
+    started: null, bought: null, done: null,
+  }));
+  const byRank = [...open].sort((a, b) => a.rank - b.rank);
+  const eurPerWeek = (s.eur_per_month * 12) / 52;
+  const weeksNeeded = (p) =>
+    p.monitorLeft +
+    (p.paid ? 0 : Math.ceil(p.cost_eur / Math.max(1, eurPerWeek))) +
+    Math.ceil((p.buyLeft + p.workLeft) / Math.max(0.5, s.hours_per_week));
+  const inSlot = (p) => p.phase === "monitor" || p.phase === "work" || (p.phase === "buy" && p.paid);
+
+  for (const p of byRank) {
+    if (p.status === "monitoring") { p.phase = "monitor"; p.started = start; }
+    if (p.status === "bought") { p.phase = p.buyLeft > 0 ? "buy" : "work"; p.started = start; }
+  }
+
+  let pot = s.saved_eur, idle = 0, w = 0;
+  const potAtWeek = [];
+  for (; w < MAX_WEEKS && byRank.some((p) => p.phase !== "done"); w++) {
+    const d = addDays(start, 7 * w);
+    const weekEnd = addDays(d, 6);
+    if (w > 0 && containsFirst(d)) pot += s.eur_per_month;
+
+    const urgent = byRank
+      .filter((p) => p.deadline && p.phase !== "done" && (p.deadline - d) / 6048e5 <= weeksNeeded(p) + 4)
+      .sort((a, b) => a.deadline - b.deadline);
+    for (const p of urgent) p.urgentFrom = p.urgentFrom || d;
+    const order = [...urgent, ...byRank.filter((p) => !urgent.includes(p))];
+
+    let slots = byRank.filter(inSlot).length;
+    let hours = s.hours_per_week, higherSaving = false;
+    for (const p of order) {
+      if (p.phase === "done") continue;
+      if (p.phase === "wait") {
+        if (p.earliest && p.earliest > weekEnd) continue;
+        if (p.monitorLeft > 0) {
+          const nextForMoney = !higherSaving || (s.mode === "skip" && p.cost_eur <= s.eur_per_month);
+          if (slots >= s.max_active || !nextForMoney) { if (!nextForMoney) higherSaving = true; continue; }
+          p.phase = "monitor"; p.started = d; slots++;
+        } else p.phase = "buy";
+      }
+      let mark = "held", used = 0;
+      if (p.phase === "monitor") {
+        p.weeks[w] = "monitor";
+        if (--p.monitorLeft <= 0) p.phase = "buy";
+        continue;
+      }
+      if (p.phase === "buy" && !p.paid) {
+        const mayBuy = !higherSaving || (s.mode === "skip" && p.cost_eur <= s.eur_per_month);
+        if (mayBuy && pot >= p.cost_eur) {
+          if (slots >= s.max_active) { p.weeks[w] = "held"; continue; }
+          slots++;
+          pot -= p.cost_eur; p.paid = true; p.bought = d; p.started = p.started || d;
+        } else {
+          higherSaving = true;
+          p.weeks[w] = "saving";
+          continue;
+        }
+      }
+      if (!p.started) {
+        if (slots >= s.max_active) { p.weeks[w] = "held"; continue; }
+        p.started = d; slots++;
+      }
+      if (p.phase === "buy") {
+        const h = Math.min(hours, p.buyLeft);
+        p.buyLeft -= h; hours -= h; used += h;
+        if (p.buyLeft <= 1e-9) p.phase = "work";
+      }
+      if (p.phase === "work") {
+        const h = Math.min(hours, p.workLeft);
+        p.workLeft -= h; hours -= h; used += h;
+        if (p.workLeft <= 1e-9) { p.phase = "done"; p.done = d; }
+      }
+      if (used > 0 || p.phase === "done" || p.bought === d) mark = "doing";
+      p.weeks[w] = mark;
+      p.hours[w] = used;
+    }
+    idle += hours;
+    potAtWeek[w] = pot;
+  }
+  return { start, order: byRank, weeks: w, idle, potAtWeek, unfinished: byRank.filter((p) => p.phase !== "done") };
+}
+
+function settingsFromForm() {
+  const s = {};
+  for (const f of FIELDS) s[f] = Math.max(0, Number(document.getElementById(f).value) || 0);
+  s.max_active = Math.max(1, Math.round(s.max_active));
+  s.mode = document.querySelector("input[name=mode]:checked").value;
+  return s;
+}
+function fillForm(s) {
+  for (const f of FIELDS) document.getElementById(f).value = s[f];
+  document.querySelector(`input[name=mode][value=${s.mode === "strict" ? "strict" : "skip"}]`).checked = true;
+}
+
+function renderNow(sim, s) {
+  const items = [], saving = [];
+  for (const p of sim.order) {
+    const st = p.weeks[0];
+    if (!st) continue;
+    if (st === "saving") { saving.push(p); continue; }
+    let text;
+    if (st === "monitor") text = `<b>${esc(p.name)}</b>: watch listings (${p.monitor_weeks} week${p.monitor_weeks === 1 ? "" : "s"} of looking).`;
+    else if (st === "doing") {
+      const paidNow = p.bought && p.bought.getTime() === sim.start.getTime();
+      const h = p.hours[0] || 0;
+      const doneNow = p.done && p.done.getTime() === sim.start.getTime();
+      const steps = [paidNow ? `buy it (${eur(p.cost_eur)})` : "", h ? `${hrs(h)} of work` : ""].filter(Boolean).join(", then ");
+      text = `<b>${esc(p.name)}</b>: ${steps || "carry on"}.${doneNow ? " Done this week." : ""}`;
+    } else text = `<b>${esc(p.name)}</b>: waiting for a free slot or for hours this week.`;
+    items.push(`<li>${text}</li>`);
+  }
+  if (saving.length) {
+    const list = saving.map((p) => `${esc(p.name)} (${eur(p.cost_eur)}, ~${p.bought ? fmtMonth(p.bought) : "never"})`).join(", ");
+    items.push(`<li>Savings after this week: <b>${eur(sim.potAtWeek[0] || 0)}</b>. Saving for, in order: ${list}.</li>`);
+  }
+  const next = sim.order.filter((p) => p.started && p.started > sim.start).sort((a, b) => a.started - b.started)[0];
+  if (next) items.push(`<li class="note">Next to take a slot: ${esc(next.name)}, around ${fmtDate(next.started)}.</li>`);
+  if (!items.length) items.push("<li>Nothing to do: every project is done or waiting for its earliest date.</li>");
+  document.getElementById("now").innerHTML = items.join("");
+}
+
+function renderPlan(sim) {
+  const head = "<tr><th>#</th><th>Project</th><th>Cost</th><th>Chore</th><th>Starts</th><th>Bought</th><th>Done</th></tr>";
+  const body = sim.order.map((p) => {
+    const chore = p.buy_h + p.work_h;
+    let done = fmtDate(p.done);
+    if (!p.done) done = `<span class="late">after ${MAX_WEEKS / 52} years</span>`;
+    let dl = "";
+    if (p.deadline) {
+      const late = !p.done || p.done > p.deadline;
+      dl = `<div class="${late ? "late" : "ok"}">${late ? "Misses" : "Meets"} ${fmtDate(p.deadline)} deadline</div>`;
+    }
+    const extras = [];
+    if (p.fun_h) extras.push(`+ ${hrs(p.fun_h)} hobby time`);
+    if (p.monitor_weeks) extras.push(`${p.monitor_weeks} wk watching`);
+    if (p.earliest) extras.push(`not before ${fmtDate(p.earliest)}`);
+    if (p.urgentFrom && p.urgentFrom > sim.start) extras.push(`jumps the queue from ${fmtDate(p.urgentFrom)}`);
+    return `<tr>
+<td class="num">${p.rank}</td>
+<td><div class="pname">${esc(p.name)}</div>${extras.length ? `<div class="pnote">${extras.join(" · ")}</div>` : ""}${p.notes ? `<div class="pnote">${esc(p.notes)}</div>` : ""}</td>
+<td class="num">${p.cost_eur ? eur(p.cost_eur) : "—"}</td>
+<td class="num">${chore ? hrs(chore) : "—"}</td>
+<td class="date">${fmtDate(p.started)}</td>
+<td class="date">${p.cost_eur ? fmtDate(p.bought) : "—"}</td>
+<td class="date">${done}${dl}</td>
+</tr>`;
+  }).join("");
+  document.getElementById("plan").innerHTML = head + body;
+}
+
+function renderSummary(sim, s) {
+  const cost = sim.order.reduce((a, p) => a + (p.paid && p.status === "bought" ? 0 : p.cost_eur), 0);
+  const chore = sim.order.reduce((a, p) => a + p.buy_h + p.work_h, 0);
+  const last = sim.order.reduce((a, p) => (p.done && (!a || p.done > a) ? p.done : a), null);
+  const parts = [
+    `Everything open costs ${eur(cost)}, about ${(Math.max(0, cost - s.saved_eur) / Math.max(1, s.eur_per_month)).toFixed(1)} months of budget, and ${hrs(chore)} of chores, ${(chore / Math.max(0.5, s.hours_per_week)).toFixed(0)} weeks of budgeted time.`,
+  ];
+  if (last) parts.push(`Last project done around ${fmtDate(last)}.`);
+  const moneyMonths = Math.max(0, cost - s.saved_eur) / Math.max(1, s.eur_per_month);
+  const timeMonths = chore / Math.max(0.5, s.hours_per_week) / 4.33;
+  if (moneyMonths > 1.5 * timeMonths) parts.push(`<b>Money is the bottleneck:</b> the chores alone would fit in ${timeMonths.toFixed(0)} month(s), so extra hours won't speed things up; extra euros or dropping a big buy will.`);
+  else if (timeMonths > 1.5 * moneyMonths) parts.push(`<b>Time is the bottleneck:</b> the money is there sooner than the hours.`);
+  if (sim.unfinished.length) parts.push(`<span class="late">${sim.unfinished.length} project(s) never finish with these settings.</span>`);
+  document.getElementById("summary").innerHTML = parts.join(" ");
+}
+
+function renderGantt(sim) {
+  const months = [];
+  const first = new Date(sim.start.getFullYear(), sim.start.getMonth(), 1);
+  const lastWeek = addDays(sim.start, 7 * Math.max(0, sim.weeks - 1));
+  for (let m = new Date(first); m <= lastWeek && months.length < 36; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) months.push(m);
+  if (!months.length) months.push(first);
+  const key = (d) => d.getFullYear() * 12 + d.getMonth();
+  const head = `<tr><th></th>${months.map((m) => `<th>${fmtMonth(m)}</th>`).join("")}</tr>`;
+  const body = sim.order.map((p) => {
+    const cells = months.map((m) => {
+      const states = new Set();
+      p.weeks.forEach((st, w) => { if (st && key(addDays(sim.start, 7 * w)) === key(m)) states.add(st); });
+      const st = STATE_ORDER.find((x) => states.has(x));
+      const isDl = p.deadline && key(p.deadline) === key(m);
+      const isDone = p.done && key(p.done) === key(m);
+      const cls = ["cell", st ? "st-" + st : "", isDl ? "dl" : ""].join(" ");
+      return `<td class="${cls}" title="${esc(p.name)}, ${fmtMonth(m)}${st ? ": " + st : ""}">${isDone ? "✓" : ""}</td>`;
+    }).join("");
+    return `<tr><td class="label">${p.rank}. ${esc(p.name)}</td>${cells}</tr>`;
+  }).join("");
+  document.getElementById("gantt").innerHTML = head + body;
+}
+
+function renderClosed() {
+  const closed = projects.filter((p) => p.status === "done" || p.status === "dropped");
+  document.getElementById("closed").innerHTML = closed.length
+    ? `<h2>Done and dropped</h2><ul>${closed.map((p) => `<li>${esc(p.name)}: ${p.status}</li>`).join("")}</ul>`
+    : "";
+}
+
+function render() {
+  const s = settingsFromForm();
+  document.getElementById("mode-note").textContent = s.mode === "strict"
+    ? "Strict order: nothing is bought while a higher-ranked project is still saving up."
+    : `Small buys skip ahead: anything up to ${eur(s.eur_per_month)} can be bought while a higher-ranked project is still saving; bigger buys wait their turn.`;
+  const sim = simulate(projects, s);
+  renderNow(sim, s);
+  renderPlan(sim);
+  renderSummary(sim, s);
+  renderGantt(sim);
+  renderClosed();
+}
+
+Promise.all([
+  fetch("projects.csv", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("projects.csv: " + r.status); return r.text(); }),
+  fetch("settings.json", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("settings.json: " + r.status); return r.json(); }),
+]).then(([csv, settings]) => {
+  projects = parseCSV(csv).map((r) => {
+    for (const k of NUMERIC) r[k] = Number(r[k]) || 0;
+    r.earliest = parseDate(r.earliest);
+    r.deadline = parseDate(r.deadline);
+    r.status = (r.status || "todo").toLowerCase();
+    return r;
+  });
+  defaults = settings;
+  fillForm(defaults);
+  document.getElementById("panel").addEventListener("input", render);
+  document.getElementById("reset").addEventListener("click", () => { fillForm(defaults); render(); });
+  render();
+}).catch((e) => {
+  const el = document.getElementById("error");
+  el.textContent = "Couldn't load the project list (" + e.message + ").";
+  el.hidden = false;
+});
+</script>
+</body>
+</html>

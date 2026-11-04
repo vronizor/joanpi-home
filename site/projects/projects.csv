@@ -1,0 +1,10 @@
+rank,id,name,status,cost_eur,buy_h,work_h,fun_h,monitor_weeks,earliest,deadline,notes
+1,ssd,SSD for the Pi,todo,100,1,1,0,0,,,"Official 256 GB NVMe kit (M.2 HAT+). Price is an estimate: one EU shop lists €134–160. Check the HAT fits in the official case before ordering."
+2,nas-check,NAS: health-check old drives,todo,0,0,1,0,0,,,"SMART check on every old drive; copy off any that are failing. If one is failing, move the NAS back up to #3."
+3,film,Film archive: supplies + index,todo,100,0.5,6,0,0,,,"Print File clear sleeves (€49.90/100), A4 maxi binders, light pad (price not checked). 6 h gets every roll into Lux Archive, not scanned."
+4,omnium,Omnium baby setup,todo,300,3,2,0,0,,2027-04-01,"Child Seat Rack (€120) + Yepp Nexxt 2 Maxi or Qibbel Air (seat price not checked), cold-weather kit. Security gear not included."
+5,sony,Sony SRS-50 web radio,todo,100,2,0,10,0,,,"Pi Zero 2 W or ESP32 + amp + replacement drivers. The 10 h of building is hobby time, not budgeted."
+6,cx,CX bike,todo,1000,0,0,0,4,2027-02-01,,"Trek Crockett, singlespeed, 58 cm, used. Buy after the season. Target under €1,000, ceiling €1,500. Pickup and test ride not counted."
+7,nas,NAS,todo,2085,2,8,0,0,,,"UGREEN DXP4800 Plus + 3×8 TB, TrueNAS, Immich, restic to the Pi. Includes the Pi's backup drive and an NVMe boot SSD. Late-September prices. Below the CX bike while the old drives are healthy."
+8,lens,OM-10 lens,todo,150,0,0,0,3,,,"Zuiko 85 f/2 or 100 f/2. Fits the Fuji via an adapter too, so it may be worth deciding after the camera."
+9,camera,Digital camera,todo,800,0,0,0,3,,,"Used Fuji X-S10 + OM adapter. A dealer lists one at €899; private sales should be lower (not checked)."

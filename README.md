@@ -4,9 +4,11 @@ The homepage for the services on joan-pi, a late-90s portal page with a link to 
 
 - **Pi Recipes** (`/recipes.html`): a command reference for the Pi.
 - **Pi Chart** (`/chart/`): the Pi's health, live and over the last 48 hours.
+- **Pi Projects** (`/projects/`): personal projects scheduled against a monthly money budget and a weekly chore-time budget.
 
 ```
 site/                  homepage, Pi Recipes, icons, fonts (served by nginx as-is)
+  projects/            Pi Projects: page, projects.csv, settings.json
 nginx/                 nginx config: serves site/, forwards /chart/ to Pi Chart
 pichart/               Pi Chart: collector + its page (Python, standard library only)
   services.json        which containers are which service, and how to count their activity
@@ -27,6 +29,28 @@ Baby Buddy's and AdGuard Home's icons are not copied here: the homepage loads th
 - Pi Chart code: `git pull && docker compose up -d --build pichart`.
 - `services.json` only: `docker compose restart pichart`.
 - Anything under `ops/`: `git pull && sudo ops/install.sh`.
+
+## Pi Projects
+
+A static page: `site/projects/index.html` reads `projects.csv` and `settings.json` next to it and plans the projects week by week in the browser. Edit either file and `git pull` on the Pi; nothing restarts.
+
+`settings.json`: `eur_per_month` (lands on the 1st, carries over), `saved_eur` (money available now), `hours_per_week` (chore time, doesn't carry over), `max_active` (slots), `mode` (`skip` lets buys up to one month's budget jump the queue; `strict` keeps every purchase in rank order).
+
+`projects.csv`, one row per project:
+
+| Column | Meaning |
+|---|---|
+| `rank` | Priority, 1 first |
+| `id`, `name` | Short id and display name |
+| `status` | `todo`, `monitoring` (already watching listings), `bought` (paid, `work_h` is what's left), `done`, `dropped` |
+| `cost_eur` | Purchase cost |
+| `buy_h`, `work_h` | Chore hours to buy, then to install or do the work |
+| `fun_h` | Hobby hours, shown but never taken from the budget |
+| `monitor_weeks` | Weeks of watching listings before buying (calendar time, no hours) |
+| `earliest`, `deadline` | Optional dates, `YYYY-MM-DD` |
+| `notes` | Free text; quote it if it contains commas |
+
+A slot means attention: watching, buying and working take one, saving up doesn't. A project with a deadline jumps the queue once the weeks it needs, plus four, would otherwise run out. The boxes on the page change the settings for a what-if only.
 
 ## Pi Chart
 
