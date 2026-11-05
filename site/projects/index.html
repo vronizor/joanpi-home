@@ -87,8 +87,10 @@ td.date { white-space: nowrap; }
 .over { color: #a00000; }
 .under { color: #006600; }
 tr.total td { font-weight: bold; background: #f2f2f2; }
-details.algo { margin-top: 10px; }
-details.algo > summary { padding: 4px 10px; background: #dcdcdc; border-top: 2px solid #808080; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold; cursor: pointer; }
+details.algo, details.box { margin-top: 10px; }
+details.box ul { margin: 6px 0 0; }
+details.box li { font-size: 16px; margin-bottom: 6px; }
+details.algo > summary, details.box > summary { padding: 4px 10px; background: #dcdcdc; border-top: 2px solid #808080; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold; cursor: pointer; }
 details.algo .body { display: flex; flex-direction: column; gap: 8px; padding: 10px 2px 0; }
 details.algo h3 { margin: 8px 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 14px; }
 details.algo li { font-size: 16px; margin-bottom: 3px; }
@@ -148,6 +150,8 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 <div class="scroll"><table id="ledger"></table></div>
 <p class="note" id="calibration"></p>
 
+<div id="box"></div>
+
 <div id="closed"></div>
 
 <details class="algo">
@@ -192,6 +196,8 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 <li><b>Slots are attention.</b> Watching, buying and working take a slot; saving doesn't. With all slots in use, the next project waits even if the money and hours are there.</li>
 <li><b>Skipping ahead</b> (the default mode): a project costing no more than one month's budget may be bought while a higher-ranked project is still saving. Nothing skips ahead of a deadline project that is saving. In strict mode nothing skips at all.</li>
 <li><b>Deadline projects at the front get money and hours first</b>, ahead of better-ranked projects without a deadline.</li>
+<li><b>Scheduled items</b> (maintenance with a date, like a bike service) take money and hours like any project but never a slot, so they don't compete with projects for attention.</li>
+<li><b>Pandora's box</b> items aren't planned at all: no slot, no money, no hours. They're listed below the ledger until one is promoted.</li>
 </ul>
 
 <h3>What it doesn't do</h3>
@@ -307,7 +313,7 @@ function ledger() {
 function simulate(rows, s, balance) {
   const now = today();
   const start = monday(now);
-  const open = rows.filter((r) => r.status !== "done" && r.status !== "dropped").map((r) => ({
+  const open = rows.filter((r) => r.status !== "done" && r.status !== "dropped" && r.list !== "box").map((r) => ({
     ...r,
     phase: "wait",
     monitorLeft: r.status === "bought" ? 0 : r.monitor_weeks,
@@ -329,7 +335,7 @@ function simulate(rows, s, balance) {
     Math.max(
       Math.ceil((p.buyLeft + p.workLeft) / Math.max(0.5, s.chore_hours_per_week)),
       Math.ceil(p.hobbyLeft / Math.max(0.5, s.hobby_hours_per_week)));
-  const inSlot = (p) => p.phase === "monitor" || p.phase === "work" || (p.phase === "buy" && p.paid);
+  const inSlot = (p) => p.list !== "scheduled" && (p.phase === "monitor" || p.phase === "work" || (p.phase === "buy" && p.paid));
 
   for (const p of byRank) {
     if (p.status === "monitoring") { p.phase = "monitor"; p.started = start; }
@@ -371,6 +377,12 @@ function simulate(rows, s, balance) {
       if (!p.heldLogged) { p.heldLogged = true; note(w, `${p.name} waits for a free slot (all ${s.max_active} in use).`); }
     };
     const canSkip = (p) => s.mode === "skip" && !urgentSaving && p.cost_eur <= s.eur_per_month;
+    const takeSlot = (p) => {
+      if (p.list === "scheduled") return true;
+      if (slots >= s.max_active) return false;
+      slots++;
+      return true;
+    };
     for (const p of order) {
       if (p.phase === "done") continue;
       if (p.phase === "wait") {
@@ -379,8 +391,8 @@ function simulate(rows, s, balance) {
           const nextForMoney = !higherSaving || canSkip(p);
           if (!nextForMoney) { higherSaving = true; continue; }
           if (pot + eurPerWeek * p.monitorLeft < p.cost_eur) { higherSaving = true; firstSaver = firstSaver || p; continue; }
-          if (slots >= s.max_active) continue;
-          p.phase = "monitor"; p.started = d; slots++;
+          if (!takeSlot(p)) continue;
+          p.phase = "monitor"; p.started = d;
           note(w, `${p.name}: start watching listings (${p.monitorLeft} week${p.monitorLeft === 1 ? "" : "s"}).`);
         } else p.phase = "buy";
       }
@@ -392,8 +404,7 @@ function simulate(rows, s, balance) {
       if (p.phase === "buy" && !p.paid) {
         const mayBuy = !higherSaving || canSkip(p);
         if (mayBuy && pot >= p.cost_eur) {
-          if (slots >= s.max_active) { hold(p); continue; }
-          slots++;
+          if (!takeSlot(p)) { hold(p); continue; }
           pot -= p.cost_eur; p.paid = true; p.bought = d; p.started = p.started || d;
           note(w, `${p.name} bought for ${eur(p.cost_eur)}${higherSaving && firstSaver ? `, ahead of ${firstSaver.name} (still saving), because it costs no more than one month's budget` : ""}; savings ${eur(pot)}.`);
         } else {
@@ -405,8 +416,8 @@ function simulate(rows, s, balance) {
         }
       }
       if (!p.started) {
-        if (slots >= s.max_active) { hold(p); continue; }
-        p.started = d; slots++;
+        if (!takeSlot(p)) { hold(p); continue; }
+        p.started = d;
       }
       let c = 0, h = 0;
       if (p.phase === "buy") {
@@ -461,14 +472,14 @@ function renderNow(sim) {
       const work = hoursText(p.chore[0] || 0, p.hobby[0] || 0);
       const steps = [paidNow ? `buy it (${eur(p.cost_eur)})` : "", work].filter(Boolean).join(", then ");
       text = `<b>${esc(p.name)}</b>: ${steps || "carry on"}.${doneNow ? " Done this week." : ""}`;
-    } else text = `<b>${esc(p.name)}</b>: waiting for a free slot or for hours this week.`;
+    } else text = `<b>${esc(p.name)}</b>: waiting for ${p.list === "scheduled" ? "hours" : "a free slot or for hours"} this week.`;
     items.push(`<li>${text}</li>`);
   }
   if (saving.length) {
     const list = saving.map((p) => `${esc(p.name)} (${eur(p.cost_eur)}, ~${p.bought ? fmtMonth(p.bought) : "never"})`).join(", ");
     items.push(`<li>Savings after this week: <b>${eur(sim.potAtWeek[0] || 0)}</b>. Saving for, in order: ${list}.</li>`);
   }
-  const next = sim.order.filter((p) => p.started && p.started > sim.start).sort((a, b) => a.started - b.started)[0];
+  const next = sim.order.filter((p) => p.list !== "scheduled" && p.started && p.started > sim.start).sort((a, b) => a.started - b.started)[0];
   if (next) items.push(`<li class="note">Next to take a slot: ${esc(next.name)}, around ${fmtDate(next.started)}.</li>`);
   if (!items.length) items.push("<li>Nothing to do: every project is done or waiting for its earliest date.</li>");
   document.getElementById("now").innerHTML = items.join("");
@@ -484,6 +495,7 @@ function renderPlan(sim) {
       done += `<div class="${late ? "late" : "ok"}">${late ? "Misses" : "Meets"} ${fmtDate(p.deadline)} deadline</div>`;
     }
     const extras = [];
+    if (p.list === "scheduled") extras.push("scheduled, takes no slot");
     if (p.status === "bought") extras.push(`bought for ${eur(paidOf(p))}${p.spent_eur === null ? " (estimate)" : ""}`);
     if (p.status === "monitoring") extras.push("watching listings now");
     if (p.monitor_weeks && p.status !== "bought") extras.push(`${p.monitor_weeks} wk watching`);
@@ -518,6 +530,8 @@ function renderSummary(sim, s, balance) {
   if (moneyMonths > 1.5 * timeMonths) parts.push(`<b>Money is the bottleneck:</b> the hours alone would fit in ${Math.max(1, Math.round(timeMonths))} month(s), so more time won't speed things up; more euros or dropping a big buy will.`);
   else if (timeMonths > 1.5 * moneyMonths) parts.push(`<b>Time is the bottleneck:</b> the money is there sooner than the hours.`);
   if (sim.unfinished.length) parts.push(`<span class="late">${sim.unfinished.length} project(s) never finish with these settings.</span>`);
+  const box = boxRows();
+  if (box.length) parts.push(`Not counted: ${box.length} idea${box.length === 1 ? "" : "s"} in Pandora's box (${eur(box.reduce((a, p) => a + p.cost_eur, 0))}).`);
   document.getElementById("summary").innerHTML = parts.join(" ");
 }
 
@@ -593,6 +607,23 @@ function renderLog(sim) {
     : "<p>Nothing happens: every project is done.</p>";
 }
 
+function boxRows() {
+  return projects.filter((p) => p.list === "box" && p.status !== "done" && p.status !== "dropped").sort((a, b) => a.rank - b.rank);
+}
+
+function renderBox() {
+  const box = boxRows();
+  document.getElementById("box").innerHTML = box.length
+    ? `<details class="box"><summary>Pandora's box (${box.length})</summary>
+<p class="note">Ideas for one day, not planned and not saved for. Once a month, check whether any has become more urgent than what's in the plan; promoting one means giving it a place in the plan and checking its estimates.</p>
+<ul>${box.map((p) => {
+      const bits = [p.cost_eur ? eur(p.cost_eur) : "", p.earliest ? `not before ${fmtDate(p.earliest)}` : "", p.deadline ? `by ${fmtDate(p.deadline)}` : ""].filter(Boolean);
+      return `<li><b>${esc(p.name)}</b>${bits.length ? ` · ${bits.join(" · ")}` : ""}${p.notes ? `<div class="pnote">${esc(p.notes)}</div>` : ""}</li>`;
+    }).join("")}</ul>
+</details>`
+    : "";
+}
+
 function renderClosed() {
   const closed = projects.filter((p) => p.status === "done" || p.status === "dropped");
   document.getElementById("closed").innerHTML = closed.length
@@ -613,6 +644,7 @@ function render() {
   renderSummary(sim, s, L.balance);
   renderGantt(sim);
   renderLedger(L);
+  renderBox();
   renderClosed();
   renderLog(sim);
 }
@@ -629,6 +661,7 @@ Promise.all([
     r.earliest = parseDate(r.earliest);
     r.deadline = parseDate(r.deadline);
     r.status = (r.status || "todo").toLowerCase();
+    r.list = (r.list || "project").toLowerCase();
     return r;
   });
   ledgerRows = parseCSV(ledgerCsv)

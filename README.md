@@ -72,6 +72,7 @@ Savings today = latest balance + monthly rate on every 1st since + deposits − 
 | `rank` | Priority, 1 first |
 | `id`, `name` | Short id and display name |
 | `status` | `todo`, `monitoring` (already watching listings), `bought` (paid, `work_h` is what's left), `done`, `dropped` |
+| `list` | `project` (default): planned, takes a slot. `scheduled`: maintenance with a date, planned for money and hours but takes no slot. `box`: Pandora's box, one-day ideas, not planned at all |
 | `cost_eur` | Estimated cost, rounded up with shipping and small extras |
 | `spent_eur`, `bought_on` | What was actually paid and when, once bought; shown in the Ledger section, the price against the estimate |
 | `buy_h`, `work_h` | Chore hours to buy, then to install or do the work |
