@@ -87,6 +87,15 @@ td.date { white-space: nowrap; }
 .over { color: #a00000; }
 .under { color: #006600; }
 tr.total td { font-weight: bold; background: #f2f2f2; }
+details.algo { margin-top: 10px; }
+details.algo > summary { padding: 4px 10px; background: #dcdcdc; border-top: 2px solid #808080; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold; cursor: pointer; }
+details.algo .body { display: flex; flex-direction: column; gap: 8px; padding: 10px 2px 0; }
+details.algo h3 { margin: 8px 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 14px; }
+details.algo li { font-size: 16px; margin-bottom: 3px; }
+details.algo li ul { margin-top: 4px; }
+details.log > summary { font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #0000ee; text-decoration: underline; cursor: pointer; }
+details.log .log-week { margin: 10px 0 2px; font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: bold; color: #444444; }
+details.log li { font-size: 15px; }
 footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; text-align: center; font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; display: flex; flex-direction: column; gap: 6px; }
 </style>
 </head>
@@ -141,16 +150,68 @@ footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; tex
 
 <div id="closed"></div>
 
-<h2>How it plans</h2>
-<ul class="note">
-<li>Savings are a ledger. It starts from the latest balance check, adds the monthly saving rate in force on every 1st since, adds extra deposits, and subtracts other spending and every project bought since (what you paid, or the estimate until you say). The plan starts from today's balance; deposits, spending and rate changes dated in the future are counted when they land.</li>
-<li>Week by week from this Monday. Money lands on the 1st of each month and carries over. Chore and hobby hours are two separate weekly budgets; neither carries over, and neither covers the other.</li>
-<li>Each project goes: watch listings (calendar time, no hours; it starts only once the project is next in line for money and the savings will cover it by the end of the watching) → buy (money, then chore hours to buy) → work (chore hours and hobby hours, each from its own budget).</li>
-<li>A slot is attention: watching listings, buying and working take one; saving up doesn't. Projects take free slots in rank order once their earliest date has passed, and hours go to the highest-ranked project in a slot.</li>
-<li>A project with a deadline keeps its rank until the deadline gets close: once the time it needs plus 4 weeks of margin would run out, it jumps to the front. The money it needs counts every unbought deadline project due on or before it, since they all draw on the same savings.</li>
-<li><b>Small buys skip ahead</b>: a purchase of at most one month's budget can go through while a higher-ranked project is still saving; bigger ones wait their turn, and nothing skips ahead of a deadline project that is saving. <b>Strict order</b>: nothing is bought until every higher-ranked project waiting for money has been bought.</li>
-<li>Costs are rounded-up estimates including shipping and small extras. The list lives in <code>projects.csv</code> and the defaults in <code>settings.json</code>, in a private data repo; the boxes above are a what-if for the future and aren't saved. Changing the monthly amount replaces any planned rate change.</li>
+<details class="algo">
+<summary>How the scheduler works</summary>
+<div class="body">
+
+<p>It's a week-by-week simulation, not an optimiser. Starting this Monday, it steps through the weeks one at a time and applies the same fixed rules every week, until every project is done or five years have passed. Nothing is random and nothing is learned: the same files always give the same plan. It runs in your browser each time the page loads or a box above changes.</p>
+
+<h3>What goes in</h3>
+<ul>
+<li><b>Savings today</b>, from the ledger: the latest balance check, plus the monthly rate on every 1st since, plus deposits, minus other spending and every project bought since (the price paid, or the estimate until it's entered).</li>
+<li><b>Money to come</b>: the rate in force on each future 1st (from the data, or the box above if you change it), plus deposits and spending dated in the future.</li>
+<li><b>Two hour budgets per week</b>, chore and hobby. Hours not used in their week are lost, and one budget never covers the other.</li>
+<li><b>Each project</b>: rank, cost, chore hours to buy, chore hours of work, hobby hours, weeks of watching listings, and optionally an earliest date and a deadline.</li>
 </ul>
+
+<h3>The life of a project</h3>
+<ol>
+<li><b>Waiting</b>: not started; holds no slot.</li>
+<li><b>Watching listings</b>, if it has watching weeks: holds a slot, uses no hours, lasts that many weeks.</li>
+<li><b>Saving</b>: waiting for the money; holds no slot.</li>
+<li><b>Bought</b>: the cost leaves the savings and the project takes a slot. Its buying hours (chore) come first.</li>
+<li><b>Work</b>: chore hours and hobby hours, each from its own budget. Done once both are used up.</li>
+</ol>
+
+<h3>Each week, in this order</h3>
+<ol>
+<li><b>Money lands.</b> If the week contains a 1st, that month's rate is added. Deposits and spending dated in the week are applied.</li>
+<li><b>Deadlines are checked.</b> For each project with a deadline it estimates the weeks still needed: watching weeks left, plus weeks to save the money (its own cost and that of every other unbought deadline project due on or before it, minus current savings, at the average weekly rate), plus weeks of hours (the slower of the chore and hobby parts). If that plus 4 weeks of margin reaches the deadline, the project moves to the front of the queue, earliest deadline first, and stays there.</li>
+<li><b>The queue is walked once, top to bottom</b>: front-of-queue deadline projects first, then rank order. For each project:
+<ul>
+<li>It's skipped if its earliest date hasn't come.</li>
+<li>It starts watching listings only if a slot is free, no higher project is still saving (unless it may skip ahead, below), and current savings plus the money arriving during the watching weeks will cover its cost. So you don't watch listings for something you can't buy yet.</li>
+<li>It's bought if the savings cover the cost, a slot is free, and no higher project is still saving (unless it may skip ahead). Otherwise it's marked as saving, and every project below it is now "behind a saver".</li>
+<li>Once bought (or if it's free) and in a slot, it gets hours: the chore budget goes to the highest project in the queue first, then what's left to the next, and the hobby budget the same way.</li>
+</ul></li>
+<li><b>Unused hours are dropped</b>, and the next week starts.</li>
+</ol>
+
+<h3>Rules worth knowing</h3>
+<ul>
+<li><b>Slots are attention.</b> Watching, buying and working take a slot; saving doesn't. With all slots in use, the next project waits even if the money and hours are there.</li>
+<li><b>Skipping ahead</b> (the default mode): a project costing no more than one month's budget may be bought while a higher-ranked project is still saving. Nothing skips ahead of a deadline project that is saving. In strict mode nothing skips at all.</li>
+<li><b>Deadline projects at the front get money and hours first</b>, ahead of better-ranked projects without a deadline.</li>
+</ul>
+
+<h3>What it doesn't do</h3>
+<ul>
+<li><b>It's greedy.</b> Each week it takes whatever the rules allow and never reconsiders. It doesn't search for the best possible schedule, so another order may finish sooner or meet a deadline it misses. Read "Misses deadline" as "these rules miss it": a different rank or budget may fix it.</li>
+<li><b>The deadline check is an estimate.</b> It uses the average weekly saving (monthly × 12 ÷ 52), while money actually lands once a month, and a fixed 4-week margin. A project can move to the front a week or two earlier or later than strictly needed.</li>
+<li><b>No uncertainty.</b> Prices and hours are single numbers (prices rounded up), so dates further out are less reliable than they look, and the plan shows no range.</li>
+<li><b>It plans, it doesn't track.</b> It assumes the budgeted hours get spent. A week you skip, or hours already put into a project, only count once the files say so (a status change, or fewer hours left on the project).</li>
+<li><b>Not modelled:</b> resale value, needing to be in a particular city (the MTB is in Switzerland), lead times like delivery or the painter's queue, and anything past five years.</li>
+</ul>
+
+<p>Costs are rounded-up estimates including shipping and small extras. The list lives in <code>projects.csv</code>, the ledger in <code>ledger.csv</code> and the defaults in <code>settings.json</code>, in a private data repo. The boxes at the top are a what-if for the future and aren't saved; changing the monthly amount replaces any planned rate change.</p>
+
+<details class="log">
+<summary>Decision log for this plan</summary>
+<div id="log"></div>
+</details>
+
+</div>
+</details>
 
 <footer>
 <span><a href="/">JoanPi home</a> - <a href="/recipes.html">Pi Recipes</a> - <a href="/chart/">Pi Chart</a></span>
@@ -276,25 +337,39 @@ function simulate(rows, s, balance) {
   }
 
   let pot = balance, idle = 0, w = 0;
-  const potAtWeek = [];
+  const potAtWeek = [], log = [];
+  const note = (w, text) => log.push({ w, text });
   for (; w < MAX_WEEKS && byRank.some((p) => p.phase !== "done"); w++) {
     const d = addDays(start, 7 * w);
     const weekEnd = addDays(d, 6);
     const from = w === 0 ? now : addDays(d, -1);
-    for (const m of firstsIn(from, weekEnd)) pot += s.rateOverride !== null ? s.rateOverride : rateAt(m);
+    for (const m of firstsIn(from, weekEnd)) {
+      const r = s.rateOverride !== null ? s.rateOverride : rateAt(m);
+      pot += r;
+      if (r) note(w, `${eur(r)} saved on ${fmtDate(m)}; savings ${eur(pot)}.`);
+    }
     for (const r of ledgerRows) {
       if (r.kind === "balance" || r.date <= from || r.date > weekEnd) continue;
       pot += r.kind === "spend" ? -r.amount_eur : r.amount_eur;
+      note(w, `${r.kind === "spend" ? "−" : "+"}${eur(r.amount_eur)} (${r.note || r.kind}); savings ${eur(pot)}.`);
     }
 
     const urgent = byRank
       .filter((p) => p.deadline && p.phase !== "done" && (p.deadline - d) / 6048e5 <= weeksNeeded(p, pot) + 4)
       .sort((a, b) => a.deadline - b.deadline);
-    for (const p of urgent) p.urgentFrom = p.urgentFrom || d;
+    for (const p of urgent) {
+      if (p.urgentFrom) continue;
+      p.urgentFrom = d;
+      note(w, `${p.name} moves to the front of the queue: deadline ${fmtDate(p.deadline)}, about ${weeksNeeded(p, pot)} weeks still needed plus 4 of margin.`);
+    }
     const order = [...urgent, ...byRank.filter((p) => !urgent.includes(p))];
 
     let slots = byRank.filter(inSlot).length;
-    let chore = s.chore_hours_per_week, hobby = s.hobby_hours_per_week, higherSaving = false, urgentSaving = false;
+    let chore = s.chore_hours_per_week, hobby = s.hobby_hours_per_week, higherSaving = false, urgentSaving = false, firstSaver = null;
+    const hold = (p) => {
+      p.weeks[w] = "held";
+      if (!p.heldLogged) { p.heldLogged = true; note(w, `${p.name} waits for a free slot (all ${s.max_active} in use).`); }
+    };
     const canSkip = (p) => s.mode === "skip" && !urgentSaving && p.cost_eur <= s.eur_per_month;
     for (const p of order) {
       if (p.phase === "done") continue;
@@ -303,9 +378,10 @@ function simulate(rows, s, balance) {
         if (p.monitorLeft > 0) {
           const nextForMoney = !higherSaving || canSkip(p);
           if (!nextForMoney) { higherSaving = true; continue; }
-          if (pot + eurPerWeek * p.monitorLeft < p.cost_eur) { higherSaving = true; continue; }
+          if (pot + eurPerWeek * p.monitorLeft < p.cost_eur) { higherSaving = true; firstSaver = firstSaver || p; continue; }
           if (slots >= s.max_active) continue;
           p.phase = "monitor"; p.started = d; slots++;
+          note(w, `${p.name}: start watching listings (${p.monitorLeft} week${p.monitorLeft === 1 ? "" : "s"}).`);
         } else p.phase = "buy";
       }
       if (p.phase === "monitor") {
@@ -316,18 +392,20 @@ function simulate(rows, s, balance) {
       if (p.phase === "buy" && !p.paid) {
         const mayBuy = !higherSaving || canSkip(p);
         if (mayBuy && pot >= p.cost_eur) {
-          if (slots >= s.max_active) { p.weeks[w] = "held"; continue; }
+          if (slots >= s.max_active) { hold(p); continue; }
           slots++;
           pot -= p.cost_eur; p.paid = true; p.bought = d; p.started = p.started || d;
+          note(w, `${p.name} bought for ${eur(p.cost_eur)}${higherSaving && firstSaver ? `, ahead of ${firstSaver.name} (still saving), because it costs no more than one month's budget` : ""}; savings ${eur(pot)}.`);
         } else {
           higherSaving = true;
+          firstSaver = firstSaver || p;
           if (urgent.includes(p)) urgentSaving = true;
           p.weeks[w] = "saving";
           continue;
         }
       }
       if (!p.started) {
-        if (slots >= s.max_active) { p.weeks[w] = "held"; continue; }
+        if (slots >= s.max_active) { hold(p); continue; }
         p.started = d; slots++;
       }
       let c = 0, h = 0;
@@ -341,7 +419,7 @@ function simulate(rows, s, balance) {
         p.workLeft -= cw; chore -= cw; c += cw;
         h = Math.min(hobby, p.hobbyLeft);
         p.hobbyLeft -= h; hobby -= h;
-        if (p.workLeft <= 1e-9 && p.hobbyLeft <= 1e-9) { p.phase = "done"; p.done = d; }
+        if (p.workLeft <= 1e-9 && p.hobbyLeft <= 1e-9) { p.phase = "done"; p.done = d; note(w, `${p.name} done.`); }
       }
       p.chore[w] = c; p.hobby[w] = h;
       p.weeks[w] = c > 0 || h > 0 || p.phase === "done" || p.bought === d ? "doing" : "held";
@@ -349,7 +427,7 @@ function simulate(rows, s, balance) {
     idle += chore + hobby;
     potAtWeek[w] = pot;
   }
-  return { start, order: byRank, weeks: w, idle, potAtWeek, unfinished: byRank.filter((p) => p.phase !== "done") };
+  return { start, order: byRank, weeks: w, idle, potAtWeek, log, unfinished: byRank.filter((p) => p.phase !== "done") };
 }
 
 function settingsFromForm() {
@@ -504,6 +582,17 @@ function renderLedger(L) {
     : "";
 }
 
+function renderLog(sim) {
+  const byWeek = new Map();
+  for (const e of sim.log) {
+    if (!byWeek.has(e.w)) byWeek.set(e.w, []);
+    byWeek.get(e.w).push(e.text);
+  }
+  document.getElementById("log").innerHTML = byWeek.size
+    ? [...byWeek].map(([w, items]) => `<p class="log-week">Week of ${fmtDate(addDays(sim.start, 7 * w))}</p><ul>${items.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>`).join("")
+    : "<p>Nothing happens: every project is done.</p>";
+}
+
 function renderClosed() {
   const closed = projects.filter((p) => p.status === "done" || p.status === "dropped");
   document.getElementById("closed").innerHTML = closed.length
@@ -525,6 +614,7 @@ function render() {
   renderGantt(sim);
   renderLedger(L);
   renderClosed();
+  renderLog(sim);
 }
 
 Promise.all([
