@@ -1,13 +1,15 @@
 # JoanPi home
 
-The homepage for the services on joan-pi, a late-90s portal page with a link to each service on the tailnet, plus two companion pages:
+The homepage for the services on joan-pi, a late-90s portal page with a link to each service on the tailnet, plus companion pages:
 
-- **Pi Recipes** (`/recipes.html`): a command reference for the Pi.
+- **Pi Docs** (`/docs/`): an index of reference pages, written down once so they don't have to be worked out again.
+- **Pi Recipes** (`/recipes.html`): a command reference for the Pi, listed in Pi Docs.
 - **Pi Chart** (`/chart/`): the Pi's health, live and over the last 48 hours.
 - **Pi Projects** (`/projects/`): personal projects scheduled against a monthly money budget and a weekly chore-time budget.
 
 ```
 site/                  homepage, Pi Recipes, icons, fonts (served by nginx as-is)
+  docs/                Pi Docs: index, pages, their shared docs.css/docs.js, and scripts they hand out
   projects/            Pi Projects page; its data/ comes from a private repo, never committed here
 nginx/                 nginx config: serves site/, forwards /chart/ to Pi Chart
 pichart/               Pi Chart: collector + its page (Python, standard library only)
@@ -25,10 +27,20 @@ Baby Buddy's and AdGuard Home's icons are not copied here: the homepage loads th
 
 ## Update
 
-- Homepage, Pi Recipes or Pi Projects: nothing to do once `joanpi-home-pull` is installed (it pulls every 15 minutes); otherwise `git pull`. `site/` is mounted read-only into nginx, so nothing restarts.
+- Homepage, Pi Docs, Pi Recipes or Pi Projects: nothing to do once `joanpi-home-pull` is installed (it pulls every 15 minutes); otherwise `git pull`. `site/` is mounted read-only into nginx, so nothing restarts.
 - Pi Chart code: `git pull && docker compose up -d --build pichart`.
 - `services.json` only: `docker compose restart pichart`.
 - Anything under `ops/`: `git pull && sudo ops/install.sh`.
+
+## Pi Docs
+
+Static pages in `site/docs/`, styled by `docs.css`; `docs.js` adds a Copy button to every `<div class="cmd"><pre>…</pre></div>`. Pi Recipes stays at `/recipes.html` and uses the same two files.
+
+| Page | What |
+|---|---|
+| `phone.html` | Android phone backup and cleanup from the Mac, with `phone-dump.sh` (map, copy, verify, delete only what verified) |
+
+To add a page: copy `phone.html` for the header and footer, add it to the list in `docs/index.html`. A script a page hands out lives next to it and is fetched with `curl -fsSO https://home.tailaccc17.ts.net/docs/<script>`. This repo is public: nothing personal (IDs, prices, addresses beyond the tailnet names) goes in a page.
 
 ## Pi Projects
 

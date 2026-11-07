@@ -7,78 +7,13 @@
 <title>Pi Recipes · JoanPi</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<style>
-@font-face {
-  font-family: "Alfa Slab One";
-  src: url("/fonts/alfa-slab-one-latin-400-normal.woff2") format("woff2");
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Merriweather";
-  src: url("/fonts/merriweather-latin-900-italic.woff2") format("woff2");
-  font-weight: 900;
-  font-style: italic;
-  font-display: swap;
-}
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: #ffffff; color: #000000; font-family: "Times New Roman", Times, serif; }
-a { color: #0000ee; }
-a:visited { color: #551a8b; }
-a:hover { color: #cc0000; }
-.page { max-width: 760px; margin: 0 auto; padding: 24px 16px 40px; display: flex; flex-direction: column; gap: 18px; }
-header { text-align: center; display: flex; flex-direction: column; gap: 4px; }
-.home { font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
-h1 { margin: 0; font-size: clamp(40px, 9vw, 60px); line-height: 1; letter-spacing: -1px; color: #cc0000; text-shadow: 3px 3px 0 #c4c4c4; font-weight: 400; }
-h1 .pi { font-family: "Merriweather", Georgia, serif; font-style: italic; font-weight: 900; }
-h1 .rest { font-family: "Alfa Slab One", Georgia, serif; margin-left: 10px; }
-.tagline { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; color: #444444; }
-.toc { margin: 0; text-align: center; font-size: 16px; line-height: 1.7; }
-h2 { margin: 10px 0 0; padding: 4px 10px; background: #dcdcdc; border-top: 2px solid #808080; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
-h3 { margin: 6px 0 0; font-size: 18px; }
-p, li { font-size: 17px; line-height: 1.45; }
-p { margin: 0; }
-ul { margin: 0; padding-left: 22px; }
-.cmd { position: relative; }
-pre {
-  margin: 0;
-  padding: 8px 64px 8px 10px;
-  background: #f2f2f2;
-  border: 1px solid #a0a0a0;
-  font-family: "Courier New", Courier, monospace;
-  font-size: 15px;
-  line-height: 1.45;
-  overflow-x: auto;
-  white-space: pre;
-}
-.copy {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  padding: 2px 8px;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
-  color: #000000;
-  background: #d4d0c8;
-  border: 2px solid;
-  border-color: #ffffff #808080 #808080 #ffffff;
-  cursor: pointer;
-}
-.copy:active { border-color: #808080 #ffffff #ffffff #808080; }
-.note { font-size: 15px; color: #444444; }
-table { border-collapse: collapse; font-size: 16px; }
-th, td { border: 1px solid #a0a0a0; padding: 4px 10px; text-align: left; }
-th { background: #dcdcdc; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
-td code, p code, li code { font-family: "Courier New", Courier, monospace; font-size: 15px; }
-.scroll { overflow-x: auto; }
-footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #c0c0c0; text-align: center; font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; display: flex; flex-direction: column; gap: 6px; }
-</style>
+<link rel="stylesheet" href="/docs/docs.css">
 </head>
 <body>
 <div class="page">
 
 <header>
-<a class="home" href="/">← JoanPi home</a>
+<span class="home"><a href="/">← JoanPi home</a> · <a href="/docs/">Pi Docs</a></span>
 <h1><span class="pi">Pi</span><span class="rest">Recipes</span></h1>
 <p class="tagline">commands for joan-pi</p>
 </header>
@@ -223,28 +158,11 @@ systemctl status ssh</pre></div>
 <p class="note">The first checks whether the IP changed; the second whether SSH is running.</p>
 
 <footer>
-<span><a href="/">JoanPi home</a> - <a href="/projects/">Pi Projects</a> - <a href="https://login.tailscale.com/admin/machines">Tailscale admin</a></span>
+<span><a href="/">JoanPi home</a> - <a href="/docs/">Pi Docs</a> - <a href="/projects/">Pi Projects</a> - <a href="https://login.tailscale.com/admin/machines">Tailscale admin</a></span>
 <span>Copyright © 2026 JoanPi. Tailnet only.</span>
 </footer>
 
 </div>
-<script>
-for (const block of document.querySelectorAll(".cmd")) {
-  const button = document.createElement("button");
-  button.className = "copy";
-  button.type = "button";
-  button.textContent = "Copy";
-  button.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(block.querySelector("pre").textContent);
-      button.textContent = "Copied";
-    } catch {
-      button.textContent = "Select it";
-    }
-    setTimeout(() => { button.textContent = "Copy"; }, 1500);
-  });
-  block.append(button);
-}
-</script>
+<script src="/docs/docs.js"></script>
 </body>
 </html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Phone backup &amp; cleanup · Pi Docs · JoanPi</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<div class="page">
+
+<header>
+<span class="home"><a href="/">← JoanPi home</a> · <a href="/docs/">Pi Docs</a></span>
+<h1><span class="pi">Pi</span><span class="rest">Docs</span></h1>
+<p class="tagline">phone backup &amp; cleanup · android, from the mac</p>
+</header>
+
+<p class="toc"><a href="#setup">Setup</a> - <a href="#map">1. Map</a> - <a href="#copy">2. Copy</a> - <a href="#delete">3. Delete</a> - <a href="#apps">4. Clean in apps</a> - <a href="#after">5. Afterwards</a> - <a href="#manual">By hand</a></p>
+
+<p>The rule: <b>copy, check, then delete</b>, never move. <a href="/docs/phone-dump.sh"><code>phone-dump.sh</code></a> does all three over USB, and deletes only files whose checksum matches on the drive. Anything new or changed stays on the phone.</p>
+
+<h2 id="setup">Setup (once)</h2>
+<h3>adb on the Mac</h3>
+<div class="cmd"><pre>brew install android-platform-tools</pre></div>
+<h3>USB debugging on the phone</h3>
+<ul>
+<li>Settings → About phone → tap <i>OS version</i> (MIUI/HyperOS) or <i>Build number</i> 7 times.</li>
+<li>Settings → Additional settings → Developer options → <i>USB debugging</i> on.</li>
+<li>Plug in, accept the "Allow USB debugging" prompt.</li>
+</ul>
+<div class="cmd"><pre>adb devices</pre></div>
+<p class="note">The phone should be listed as <code>device</code>, not <code>unauthorized</code>.</p>
+<h3>Get the script</h3>
+<div class="cmd"><pre>mkdir -p ~/bin &amp;&amp; cd ~/bin
+curl -fsSO https://home.tailaccc17.ts.net/docs/phone-dump.sh
+chmod +x phone-dump.sh</pre></div>
+<p class="note">Fetch it again to get updates. The commands below assume you run them from <code>~/bin</code>.</p>
+
+<h2 id="map">1. Map what takes space</h2>
+<div class="cmd"><pre>./phone-dump.sh map</pre></div>
+<p>It lists the folders of 100 MB or more on internal storage and on the SD card, then the 15 apps using the most space.</p>
+<ul>
+<li><b>Folders</b> (DCIM, WhatsApp media, Screenshots, ScreenRecorder, Movies, Recordings) can be copied off: step 2.</li>
+<li><b>App data</b> lives inside the app and can't be copied out usefully: clean it in the app, step 4. An app's data includes its folder under <code>Android/media</code>, so WhatsApp counts once, not twice.</li>
+<li>"System" in Settings → Storage can't be freed. Folders under 100 MB aren't worth the effort.</li>
+</ul>
+
+<h2 id="copy">2. Copy and check</h2>
+<p>Plug in the drive, set the dump folder once for the session, then copy each big folder. Nothing is deleted at this step.</p>
+<div class="cmd"><pre>DUMP=/Volumes/&lt;drive&gt;/phone-dump/$(date +%F)
+./phone-dump.sh copy internal DCIM/Camera "$DUMP"
+./phone-dump.sh copy internal Android/media/com.whatsapp/WhatsApp "$DUMP"
+./phone-dump.sh copy sd DCIM "$DUMP"</pre></div>
+<p class="note">Folders are relative to the volume: <code>internal</code> is the phone's own storage, <code>sd</code> the card (found by itself). The drive mirrors the phone: <code>$DUMP/internal/DCIM/Camera</code>, <code>$DUMP/sd/DCIM</code>…</p>
+<p>Done when it says <code>N of N phone files are identical on the drive</code>. If some are missing or different, run the same <code>copy</code> again. <code>verify</code> (same arguments) re-checks without copying.</p>
+
+<h2 id="delete">3. Delete what was checked</h2>
+<div class="cmd"><pre>./phone-dump.sh delete internal DCIM/Camera "$DUMP"
+./phone-dump.sh delete internal Android/media/com.whatsapp/WhatsApp/Media "$DUMP"
+./phone-dump.sh delete sd DCIM "$DUMP"</pre></div>
+<p>It hashes both sides again, shows how many files match, asks, deletes only those, and prints the folder size before and after. Photos taken since the copy are kept.</p>
+<p class="warn"><b>WhatsApp:</b> delete <code>…/WhatsApp/Media</code> only, never the whole <code>WhatsApp</code> folder: <code>Databases</code> and <code>Backups</code> hold the chat history.</p>
+<p class="warn"><b>Google Photos:</b> if backup is on, never delete from inside the Google Photos app: that deletes the cloud copy too. Deleting with this script leaves the cloud alone.</p>
+<div class="cmd"><pre>adb reboot</pre></div>
+<p class="note">After a delete, so the gallery stops showing the deleted photos.</p>
+
+<h2 id="apps">4. Clean inside apps</h2>
+<ul>
+<li><b>Any app:</b> Settings → Apps → sort by size → the app → Storage → <i>Clear cache</i>. Never <i>Clear data</i>: that resets the app.</li>
+<li><b>WhatsApp:</b> Settings → Storage and data → Manage storage. Largest files and "forwarded many times" first.</li>
+<li><b>Telegram:</b> Settings → Data and Storage → Storage Usage → Clear cache. Set "Keep media" to a week.</li>
+<li><b>Podcasts:</b> delete played episodes, or point the download folder at the SD card.</li>
+<li><b>Browser:</b> clear cached data, not cookies.</li>
+<li><b>Speech/TTS:</b> remove voice packs for languages you don't use.</li>
+<li><b>Gallery:</b> empty <i>Recently deleted</i>, which keeps photos for 30 days.</li>
+</ul>
+
+<h2 id="after">5. Afterwards</h2>
+<ul>
+<li><b>Camera → settings → storage location → SD card.</b> The camera falls back to internal storage when the card is full or was unmounted. Check again a week later.</li>
+<li><b>The drive is now the only copy.</b> Make a second one (another drive, later the NAS) before calling it done.</li>
+<li>Dump again before the SD card is nearly full, not after.</li>
+</ul>
+
+<h2 id="manual">By hand (what the script does)</h2>
+<h3>Where things are</h3>
+<div class="scroll">
+<table>
+<tr><th>What</th><th>Path on the phone</th></tr>
+<tr><td>Internal storage</td><td><code>/storage/emulated/0</code> (also <code>/sdcard</code>, a link: add a trailing <code>/</code> with <code>du</code>)</td></tr>
+<tr><td>SD card</td><td><code>/storage/XXXX-XXXX</code>, shown by <code>adb shell ls /storage</code></td></tr>
+<tr><td>Camera</td><td><code>DCIM/Camera</code></td></tr>
+<tr><td>Screenshots, screen recordings</td><td><code>DCIM/Screenshots</code>, <code>DCIM/ScreenRecorder</code> (MIUI); <code>Pictures/Screenshots</code> elsewhere</td></tr>
+<tr><td>WhatsApp media</td><td><code>Android/media/com.whatsapp/WhatsApp/Media</code></td></tr>
+<tr><td>Telegram</td><td><code>Android/media/org.telegram.messenger</code></td></tr>
+</table>
+</div>
+<h3>Sizes</h3>
+<div class="cmd"><pre>adb shell du -d2 -m /storage/emulated/0 | sort -n
+adb shell dumpsys diskstats</pre></div>
+<h3>Copy, keeping dates</h3>
+<div class="cmd"><pre>adb pull -a /storage/emulated/0/DCIM/Camera /Volumes/&lt;drive&gt;/dump/</pre></div>
+<h3>Compare checksums (macOS)</h3>
+<div class="cmd"><pre>adb shell 'cd /storage/emulated/0/DCIM/Camera &amp;&amp; md5sum *' | sed 's/  / /' | sort -k2 &gt; /tmp/phone.md5
+(cd /Volumes/&lt;drive&gt;/dump/Camera &amp;&amp; md5 -r *) | sort -k2 &gt; /tmp/drive.md5
+diff /tmp/phone.md5 /tmp/drive.md5 &amp;&amp; echo identical</pre></div>
+<p class="note">Copy with adb rather than Finder or Android File Transfer, which stall on big folders. A drive plugged straight into the phone works too (exFAT), but there's nothing to check the copy with.</p>
+
+<footer>
+<span><a href="/">JoanPi home</a> - <a href="/docs/">Pi Docs</a> - <a href="/recipes.html">Pi Recipes</a></span>
+<span>Copyright © 2026 JoanPi. Tailnet only.</span>
+</footer>
+
+</div>
+<script src="/docs/docs.js"></script>
+</body>
+</html>
