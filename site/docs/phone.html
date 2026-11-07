@@ -41,10 +41,11 @@ chmod +x phone-dump.sh</pre></div>
 
 <h2 id="map">1. Map what takes space</h2>
 <div class="cmd"><pre>./phone-dump.sh map</pre></div>
-<p>It lists the folders of 100 MB or more on internal storage and on the SD card, then the 15 apps using the most space.</p>
+<p>It prints a tree of internal storage and of the SD card, biggest first, then the 15 apps using the most space. A top-level folder shows from 100 MB; a subfolder shows when it is 100 MB or more <i>and</i> at least a quarter of its parent, so the tree follows where the space really goes (down to <code>WhatsApp/Media/WhatsApp Video</code>) without listing every album.</p>
 <ul>
 <li><b>Folders</b> (DCIM, WhatsApp media, Screenshots, ScreenRecorder, Movies, Recordings) can be copied off: step 2.</li>
 <li><b>App data</b> lives inside the app and can't be copied out usefully: clean it in the app, step 4. An app's data includes its folder under <code>Android/media</code>, so WhatsApp counts once, not twice.</li>
+<li><code>Pictures/.thumbnails</code> is the gallery's thumbnail cache: safe to delete, it rebuilds smaller once the photos are gone.</li>
 <li>"System" in Settings → Storage can't be freed. Folders under 100 MB aren't worth the effort.</li>
 </ul>
 

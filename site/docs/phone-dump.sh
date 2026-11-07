@@ -81,15 +81,40 @@ report() {
   fi
 }
 
+tree() {
+  awk -F'\t' -v root="$1" '
+    { size[$2] = $1; paths[n++] = $2 }
+    function parent(p) { sub(/\/[^\/]*$/, "", p); return p }
+    function depth(p) { return p == root ? 0 : split(substr(p, length(root) + 2), _, "/") }
+    function key(p) { return p == root ? "" : key(parent(p)) "/" sprintf("%09d", 999999999 - size[p]) substr(p, length(parent(p)) + 2) }
+    function shown(p,   q) {
+      if (p == root) return 1
+      q = parent(p)
+      if (!shown(q) || size[p] < 100) return 0
+      return depth(p) <= 1 || size[p] >= 0.25 * size[q]
+    }
+    END {
+      for (i = 0; i < n; i++) {
+        p = paths[i]
+        if (!shown(p)) continue
+        name = p == root ? root : substr(p, length(parent(p)) + 2)
+        indent = ""
+        for (d = 0; d < depth(p); d++) indent = indent "  "
+        printf "%s\t%7d  %s%s\n", key(p), size[p], indent, name
+      }
+    }' | LC_ALL=C sort -t "$(printf '\t')" -k1,1 | cut -f2-
+}
+
 map() {
   local sd
-  echo "== Internal storage: folders of 100 MB or more (MB) =="
-  adb shell "du -d2 -m $INTERNAL 2>/dev/null" | tr -d '\r' | awk '$1 >= 100' | sort -rn
+  echo "== Internal storage (MB) =="
+  adb shell "du -d6 -m $INTERNAL 2>/dev/null" | tr -d '\r' | tree "$INTERNAL"
   if sd=$(sd_root 2>/dev/null); then
     echo
-    echo "== SD card ($sd): folders of 100 MB or more (MB) =="
-    adb shell "du -d2 -m $sd 2>/dev/null" | tr -d '\r' | awk '$1 >= 100' | sort -rn
+    echo "== SD card (MB) =="
+    adb shell "du -d6 -m $sd 2>/dev/null" | tr -d '\r' | tree "$sd"
   fi
+  echo "(top-level folders of 100 MB or more; a subfolder shows when it's 100 MB or more and at least a quarter of its parent)"
   echo
   echo "== Apps by app + data size (GB) =="
   local work k
