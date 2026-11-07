@@ -56,7 +56,9 @@ chmod +x phone-dump.sh</pre></div>
 ./phone-dump.sh copy internal Android/media/com.whatsapp/WhatsApp "$DUMP"
 ./phone-dump.sh copy sd DCIM "$DUMP"</pre></div>
 <p class="note">Folders are relative to the volume: <code>internal</code> is the phone's own storage, <code>sd</code> the card (found by itself). The drive mirrors the phone: <code>$DUMP/internal/DCIM/Camera</code>, <code>$DUMP/sd/DCIM</code>…</p>
-<p>Done when it says <code>N of N phone files are identical on the drive</code>. If some are missing or different, run the same <code>copy</code> again. <code>verify</code> (same arguments) re-checks without copying.</p>
+<p>Done when it says <code>N of N phone files are identical on the drive</code>. If some are missing or different, or the copy was interrupted (lid closed, cable out), run the same <code>copy</code> again: it fetches only what's missing or different. <code>verify</code> (same arguments) re-checks without copying. Keep the same <code>$DUMP</code> date when you come back to it.</p>
+<div class="cmd"><pre>caffeinate -i ./phone-dump.sh copy internal DCIM/Camera "$DUMP"</pre></div>
+<p class="note"><code>caffeinate -i</code> keeps the Mac from going to sleep while a long copy runs. Closing the lid still puts it to sleep.</p>
 
 <h2 id="delete">3. Delete what was checked</h2>
 <div class="cmd"><pre>./phone-dump.sh delete internal DCIM/Camera "$DUMP"

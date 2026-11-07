@@ -17,6 +17,8 @@ phone-dump.sh copy   <internal|sd> <folder> <dump-dir>
 phone-dump.sh verify <internal|sd> <folder> <dump-dir>
 phone-dump.sh delete <internal|sd> <folder> <dump-dir>
     copy:   pull <folder> to <dump-dir>/<internal|sd>/<folder>, then verify.
+            If it's already there (an interrupted copy), pull only the files
+            that are missing or different.
     verify: compare checksums, phone against drive.
     delete: verify again, then delete from the phone only the files that are
             identical on the drive. Anything new or different stays on the phone.
@@ -155,7 +157,19 @@ main() {
   WORK=$(mktemp -d)
   trap 'rm -rf "$WORK"' EXIT
 
-  if [ "$cmd" = copy ]; then
+  if [ "$cmd" = copy ] && [ -d "$local_dir" ]; then
+    echo "$local_dir already exists: copying only what's missing or different."
+    checksums "$phone" "$local_dir" "$WORK"
+    local total i=0 f
+    total=$(wc -l < "$WORK/phone_only" | tr -d ' ')
+    cut -d' ' -f2- "$WORK/phone_only" | while IFS= read -r f; do
+      f=${f#./}
+      i=$((i + 1))
+      echo "[$i/$total] $f"
+      mkdir -p "$local_dir/$(dirname "$f")"
+      adb pull -a "$phone/$f" "$local_dir/$(dirname "$f")/" > /dev/null < /dev/null
+    done
+  elif [ "$cmd" = copy ]; then
     mkdir -p "$(dirname "$local_dir")"
     echo "Copying $phone → $local_dir"
     adb pull -a "$phone" "$(dirname "$local_dir")/"
