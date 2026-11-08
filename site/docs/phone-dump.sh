@@ -15,13 +15,14 @@ phone-dump.sh map
 
 phone-dump.sh copy   <internal|sd> <folder> <dump-dir>
 phone-dump.sh verify <internal|sd> <folder> <dump-dir>
-phone-dump.sh delete <internal|sd> <folder> <dump-dir>
+phone-dump.sh delete <internal|sd> <folder> <dump-dir> [--keep-days N]
     copy:   pull <folder> to <dump-dir>/<internal|sd>/<folder>, then verify.
             If it's already there (an interrupted copy), pull only the files
             that are missing or different.
     verify: compare checksums, phone against drive.
     delete: verify again, then delete from the phone only the files that are
             identical on the drive. Anything new or different stays on the phone.
+            --keep-days N also keeps files changed in the last N days.
 
     <folder> is relative to the volume root, e.g. DCIM/Camera.
 
@@ -143,7 +144,13 @@ main() {
     copy|verify|delete) ;;
     *) usage; exit 1 ;;
   esac
-  [ $# -eq 4 ] || { usage; exit 1; }
+  local keep_days=
+  if [ $# -eq 6 ] && [ "$cmd" = delete ] && [ "$5" = --keep-days ]; then
+    keep_days=$6
+    case "$keep_days" in ''|*[!0-9]*) die "--keep-days needs a number of days" ;; esac
+  elif [ $# -ne 4 ]; then
+    usage; exit 1
+  fi
   local vol=$2 rel=${3%/} dump=${4%/}
   rel=${rel#/}
   [ -n "$rel" ] && [ "$rel" != . ] || die "give a folder, not the whole volume"
@@ -179,18 +186,37 @@ main() {
   report "$WORK"
 
   if [ "$cmd" = delete ]; then
-    local n
-    n=$(wc -l < "$WORK/same" | tr -d ' ')
-    [ "$n" -gt 0 ] || { echo "Nothing verified, nothing deleted."; exit 0; }
-    echo "Before: $(adb shell "du -sm '$phone'" | tr -d '\r' | cut -f1) MB in $phone"
-    read -r -p "Delete these $n verified files from the phone? [y/N] " answer
+    local now cutoff summary n
+    adb shell "cd '$phone' && find . -type f -exec stat -c '%Y %s %n' {} +" | tr -d '\r' > "$WORK/stat"
+    now=$(adb shell date +%s | tr -d '\r')
+    cutoff=$((now + 86400))
+    [ -z "$keep_days" ] || cutoff=$((now - keep_days * 86400))
+    summary=$(awk -v cutoff="$cutoff" -v out="$WORK/list" '
+      NR == FNR { p = $0; sub(/^[^ ]+ /, "", p); ok[p] = 1; next }
+      {
+        p = $0; sub(/^[^ ]+ [^ ]+ /, "", p)
+        if (!(p in ok)) next
+        if ($1 < cutoff) { print p > out; dn++; ds += $2 } else { kn++; ks += $2 }
+      }
+      END { printf "%d %.1f %d %.1f", dn, ds / 1e9, kn, ks / 1e9 }' "$WORK/same" "$WORK/stat")
+    set -- $summary
+    n=$1
+    if [ -n "$keep_days" ]; then
+      echo "Older than $keep_days days: $1 files, $2 GB → delete."
+      echo "Last $keep_days days: $3 files, $4 GB → keep on the phone."
+    else
+      echo "All verified files: $1 files, $2 GB → delete."
+    fi
+    [ "$n" -gt 0 ] || { echo "Nothing to delete."; exit 0; }
+    read -r -p "Delete these $n files from the phone? [y/N] " answer
     [ "$answer" = y ] || [ "$answer" = Y ] || { echo "Nothing deleted."; exit 0; }
-    cut -d' ' -f2- "$WORK/same" > "$WORK/list"
+    echo "Before: $(adb shell "du -sm '$phone'" | tr -d '\r' | cut -f1) MB in $phone"
     adb push "$WORK/list" "$TMP_LIST" >/dev/null
     adb shell "cd '$phone' && while IFS= read -r f; do rm -f -- \"\$f\"; done < $TMP_LIST; rm -f $TMP_LIST"
     echo "After:  $(adb shell "du -sm '$phone'" | tr -d '\r' | cut -f1) MB in $phone"
     echo "Done. Reboot the phone so the gallery forgets the deleted files."
   fi
+
 }
 
 main "$@"

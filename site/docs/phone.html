@@ -65,6 +65,9 @@ chmod +x phone-dump.sh</pre></div>
 ./phone-dump.sh delete internal Android/media/com.whatsapp/WhatsApp/Media "$DUMP"
 ./phone-dump.sh delete sd DCIM "$DUMP"</pre></div>
 <p>It hashes both sides again, shows how many files match, asks, deletes only those, and prints the folder size before and after. Photos taken since the copy are kept.</p>
+<h3>Keep the recent ones on the phone</h3>
+<div class="cmd"><pre>./phone-dump.sh delete sd DCIM "$DUMP" --keep-days 365</pre></div>
+<p class="note">Deletes only verified files older than 365 days, and says how many files and GB it would delete and keep before asking. Age is the file's modification date, which for camera photos is when they were taken. A file whose date changed when it was moved counts as newer and is kept.</p>
 <p class="warn"><b>WhatsApp:</b> delete <code>…/WhatsApp/Media</code> only, never the whole <code>WhatsApp</code> folder: <code>Databases</code> and <code>Backups</code> hold the chat history.</p>
 <p class="warn"><b>Google Photos:</b> if backup is on, never delete from inside the Google Photos app: that deletes the cloud copy too. Deleting with this script leaves the cloud alone.</p>
 <div class="cmd"><pre>adb reboot</pre></div>
