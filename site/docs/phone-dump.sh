@@ -220,7 +220,8 @@ main() {
     [ "$answer" = y ] || [ "$answer" = Y ] || { echo "Nothing deleted."; exit 0; }
     echo "Before: $(adb shell "du -sm '$phone'" | tr -d '\r' | cut -f1) MB in $phone"
     adb push "$WORK/list" "$TMP_LIST" >/dev/null
-    adb shell "cd '$phone' && while IFS= read -r f; do rm -f -- \"\$f\"; done < $TMP_LIST; rm -f $TMP_LIST"
+    echo "Deleting on the phone (a few minutes per 10,000 files)…"
+    adb shell "cd '$phone' && i=0 && while IFS= read -r f; do rm -f -- \"\$f\"; i=\$((i + 1)); [ \$((i % 1000)) -ne 0 ] || echo \"  \$i / $n\"; done < $TMP_LIST; rm -f $TMP_LIST"
     echo "After:  $(adb shell "du -sm '$phone'" | tr -d '\r' | cut -f1) MB in $phone"
     echo "Done. Reboot the phone so the gallery forgets the deleted files."
   fi
