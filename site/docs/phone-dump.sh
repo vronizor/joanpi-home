@@ -53,6 +53,14 @@ volume_root() {
   esac
 }
 
+nfc() {
+  if iconv -f UTF-8-MAC -t UTF-8 < /dev/null > /dev/null 2>&1; then
+    iconv -f UTF-8-MAC -t UTF-8
+  else
+    cat
+  fi
+}
+
 md5_local() {
   if command -v md5 >/dev/null; then
     find . -type f ! -name '.DS_Store' ! -name '._*' -exec md5 -r {} +
@@ -67,7 +75,7 @@ checksums() {
   echo "Hashing on the phone…"
   adb shell "cd '$phone' && find . -type f -exec md5sum {} +" | tr -d '\r' | sed 's/  / /' | LC_ALL=C sort > "$work/phone"
   echo "Hashing on the drive…"
-  (cd "$local_dir" && md5_local) | LC_ALL=C sort > "$work/local"
+  (cd "$local_dir" && md5_local) | nfc | LC_ALL=C sort > "$work/local"
   LC_ALL=C comm -12 "$work/phone" "$work/local" > "$work/same"
   LC_ALL=C comm -23 "$work/phone" "$work/local" > "$work/phone_only"
 }
