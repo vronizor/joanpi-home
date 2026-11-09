@@ -18,7 +18,7 @@
 <p class="tagline">phone backup &amp; cleanup · android, from the mac</p>
 </header>
 
-<p class="toc"><a href="#setup">Setup</a> - <a href="#map">1. Map</a> - <a href="#copy">2. Copy</a> - <a href="#delete">3. Delete</a> - <a href="#apps">4. Clean in apps</a> - <a href="#after">5. Afterwards</a> - <a href="#manual">By hand</a></p>
+<p class="toc"><a href="#setup">Setup</a> - <a href="#map">1. Map</a> - <a href="#copy">2. Copy</a> - <a href="#delete">3. Delete</a> - <a href="#apps">4. Clean in apps</a> - <a href="#after">5. Afterwards</a> - <a href="#trouble">When things go wrong</a> - <a href="#manual">By hand</a></p>
 
 <p>The rule: <b>copy, check, then delete</b>, never move. <a href="/docs/phone-dump.sh"><code>phone-dump.sh</code></a> does all three over USB, and deletes only files whose checksum matches on the drive. Anything new or changed stays on the phone.</p>
 
@@ -37,7 +37,9 @@
 <div class="cmd"><pre>mkdir -p ~/bin &amp;&amp; cd ~/bin
 curl -fsSO https://home.tailaccc17.ts.net/docs/phone-dump.sh
 chmod +x phone-dump.sh</pre></div>
-<p class="note">Fetch it again to get updates. The commands below assume you run them from <code>~/bin</code>.</p>
+<p class="note">Fetch it again to get updates. The Pi picks up a change within 15 minutes; right after one, fetch from GitHub instead:</p>
+<div class="cmd"><pre>curl -fsSO https://raw.githubusercontent.com/vronizor/joanpi-home/main/site/docs/phone-dump.sh</pre></div>
+<p class="note">The commands below assume you run them from <code>~/bin</code>.</p>
 
 <h2 id="map">1. Map what takes space</h2>
 <div class="cmd"><pre>./phone-dump.sh map</pre></div>
@@ -51,12 +53,14 @@ chmod +x phone-dump.sh</pre></div>
 
 <h2 id="copy">2. Copy and check</h2>
 <p>Plug in the drive, set the dump folder once for the session, then copy each big folder. Nothing is deleted at this step.</p>
-<div class="cmd"><pre>DUMP=/Volumes/&lt;drive&gt;/phone-dump/$(date +%F)
+<p class="warn"><b>Before the first copy:</b> System Settings → Spotlight → Search Privacy → add the drive. Otherwise Spotlight indexes every copied file and keeps writing to the drive, and its index is what got damaged the one time the drive was cut off.</p>
+<div class="cmd"><pre>DUMP="/Volumes/&lt;drive&gt;/phone-dump/$(date +%F)"
 ./phone-dump.sh copy internal DCIM/Camera "$DUMP"
 ./phone-dump.sh copy internal Android/media/com.whatsapp/WhatsApp "$DUMP"
 ./phone-dump.sh copy sd DCIM "$DUMP"</pre></div>
 <p class="note">Folders are relative to the volume: <code>internal</code> is the phone's own storage, <code>sd</code> the card (found by itself). The drive mirrors the phone: <code>$DUMP/internal/DCIM/Camera</code>, <code>$DUMP/sd/DCIM</code>…</p>
 <p>Done when it says <code>N of N phone files are identical on the drive</code>. If some are missing or different, or the copy was interrupted (lid closed, cable out), run the same <code>copy</code> again: it fetches only what's missing or different. <code>verify</code> (same arguments) re-checks without copying. Keep the same <code>$DUMP</code> date when you come back to it.</p>
+<p class="note">A few differences that never go away are normal for WhatsApp: its <code>.Shared/*.tmp</code> files change while the app runs, and new media keeps arriving. They only matter if they're in the folder you delete, and then they just stay on the phone.</p>
 <div class="cmd"><pre>caffeinate -i ./phone-dump.sh copy internal DCIM/Camera "$DUMP"</pre></div>
 <p class="note"><code>caffeinate -i</code> keeps the Mac from going to sleep while a long copy runs. Closing the lid still puts it to sleep.</p>
 
@@ -64,14 +68,15 @@ chmod +x phone-dump.sh</pre></div>
 <div class="cmd"><pre>./phone-dump.sh delete internal DCIM/Camera "$DUMP"
 ./phone-dump.sh delete internal Android/media/com.whatsapp/WhatsApp/Media "$DUMP"
 ./phone-dump.sh delete sd DCIM "$DUMP"</pre></div>
-<p>It hashes both sides again, shows how many files match, asks, deletes only those, and prints the folder size before and after. Photos taken since the copy are kept.</p>
+<p>It hashes both sides again, says how many files and GB it will delete, asks, deletes only those, and prints the folder size before and after. Photos taken since the copy are kept. Answer <code>n</code> to use it as a preview.</p>
+<p class="note">The deleting itself is slow: Android updates its media index for every file, so count on several minutes per 10,000 files. It prints a line every 1,000. Interrupting it is safe; run the same <code>delete</code> again to finish.</p>
+<p class="note">A file with an accented name (é, ü, Í…) that someone sent from a Mac can stay "different" forever: the two systems spell the accent differently, so the names don't compare equal. It just stays on the phone; delete it in the app if you want it gone.</p>
 <h3>Keep the recent ones on the phone</h3>
 <div class="cmd"><pre>./phone-dump.sh delete sd DCIM "$DUMP" --keep-days 365</pre></div>
 <p class="note">Deletes only verified files older than 365 days, and says how many files and GB it would delete and keep before asking. Age is the file's modification date, which for camera photos is when they were taken. A file whose date changed when it was moved counts as newer and is kept.</p>
 <p class="warn"><b>WhatsApp:</b> delete <code>…/WhatsApp/Media</code> only, never the whole <code>WhatsApp</code> folder: <code>Databases</code> and <code>Backups</code> hold the chat history.</p>
 <p class="warn"><b>Google Photos:</b> if backup is on, never delete from inside the Google Photos app: that deletes the cloud copy too. Deleting with this script leaves the cloud alone.</p>
-<div class="cmd"><pre>adb reboot</pre></div>
-<p class="note">After a delete, so the gallery stops showing the deleted photos.</p>
+<p class="note">No reboot needed in principle: Android updates its media index as files go. If the gallery still shows blank thumbnails or Settings → Storage hasn't caught up, <code>adb reboot</code>.</p>
 
 <h2 id="apps">4. Clean inside apps</h2>
 <ul>
@@ -88,8 +93,25 @@ chmod +x phone-dump.sh</pre></div>
 <ul>
 <li><b>Camera → settings → storage location → SD card.</b> The camera falls back to internal storage when the card is full or was unmounted. Check again a week later.</li>
 <li><b>The drive is now the only copy.</b> Make a second one (another drive, later the NAS) before calling it done.</li>
+<li><b>Eject the drive before unplugging it</b> (Finder, or <code>diskutil eject disk4</code>). exFAT has no journal: unplugging it while mounted leaves it needing a repair.</li>
 <li>Dump again before the SD card is nearly full, not after.</li>
 </ul>
+
+<h2 id="trouble">When things go wrong</h2>
+<h3>The drive won't mount after being unplugged</h3>
+<p>macOS won't mount an exFAT drive that was cut off until it passes a check. Find its name (<code>disk4s2</code> here), then check and repair:</p>
+<div class="cmd"><pre>diskutil list external
+diskutil unmount disk4s2
+sudo fsck_exfat -d -y /dev/rdisk4s2</pre></div>
+<ul>
+<li>Run the repair again until it says <i>appears to be OK</i>: fixing broken files and then the free-space map ("bitmap") can take two or three passes. Then <code>diskutil mount disk4s2</code>.</li>
+<li><code>diskutil verifyVolume</code> "failing" with code 74 only means it found something; <code>repairVolume</code> or <code>fsck_exfat -y</code> is what fixes.</li>
+<li>Until the repair is clean, don't write anything to the drive: a wrong free-space map can let new files overwrite old ones. Reading is fine.</li>
+<li>If macOS offers to <i>Initialize</i> the disk: <b>Ignore</b>. That erases it.</li>
+</ul>
+<h3>"Malicious Script Blocked" and Terminal quits</h3>
+<p>Happened once (Nov 2026) while <code>delete</code> was hashing, with the published script unchanged; the log only showed macOS checking the clipboard, cause never pinned down. Nothing is deleted before you answer <code>y</code>, so just run the same command again. To see what macOS blocked:</p>
+<div class="cmd"><pre>log show --last 1h --style compact --predicate 'subsystem CONTAINS "XProtect" OR process CONTAINS "XProtect" OR eventMessage CONTAINS[c] "malware"' | tail -40</pre></div>
 
 <h2 id="manual">By hand (what the script does)</h2>
 <h3>Where things are</h3>
