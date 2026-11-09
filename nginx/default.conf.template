@@ -7,6 +7,10 @@ server {
         return 404;
     }
 
+    location = /recipes.html {
+        return 301 /docs/recipes.html;
+    }
+
     location = /chart {
         return 301 /chart/;
     }

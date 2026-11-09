@@ -2,16 +2,15 @@
 
 The homepage for the services on joan-pi, a late-90s portal page with a link to each service on the tailnet, plus companion pages:
 
-- **Pi Docs** (`/docs/`): an index of reference pages, written down once so they don't have to be worked out again.
-- **Pi Recipes** (`/recipes.html`): a command reference for the Pi, listed in Pi Docs.
+- **Pi Docs** (`/docs/`): reference pages written down once so they don't have to be worked out again, including Recipes, the Pi's command reference.
 - **Pi Chart** (`/chart/`): the Pi's health, live and over the last 48 hours.
 - **Pi Projects** (`/projects/`): personal projects scheduled against a monthly money budget and a weekly chore-time budget.
 
 ```
-site/                  homepage, Pi Recipes, icons, fonts (served by nginx as-is)
+site/                  homepage, icons, fonts (served by nginx as-is)
   docs/                Pi Docs: index, pages, their shared docs.css/docs.js, and scripts they hand out
   projects/            Pi Projects page; its data/ comes from a private repo, never committed here
-nginx/                 nginx config: serves site/, forwards /chart/ to Pi Chart
+nginx/                 nginx config: serves site/, forwards /chart/ to Pi Chart, redirects the old /recipes.html
 pichart/               Pi Chart: collector + its page (Python, standard library only)
   services.json        which containers are which service, and how to count their activity
 compose.yaml           two containers: home (nginx) and pichart
@@ -27,17 +26,18 @@ Baby Buddy's and AdGuard Home's icons are not copied here: the homepage loads th
 
 ## Update
 
-- Homepage, Pi Docs, Pi Recipes or Pi Projects: nothing to do once `joanpi-home-pull` is installed (it pulls every 15 minutes); otherwise `git pull`. `site/` is mounted read-only into nginx, so nothing restarts.
+- Homepage, Pi Docs or Pi Projects: nothing to do once `joanpi-home-pull` is installed (it pulls every 15 minutes); otherwise `git pull`. `site/` is mounted read-only into nginx, so nothing restarts.
 - Pi Chart code: `git pull && docker compose up -d --build pichart`.
 - `services.json` only: `docker compose restart pichart`.
 - Anything under `ops/`: `git pull && sudo ops/install.sh`.
 
 ## Pi Docs
 
-Static pages in `site/docs/`, styled by `docs.css`; `docs.js` adds a Copy button to every `<div class="cmd"><pre>…</pre></div>`. Pi Recipes stays at `/recipes.html` and uses the same two files.
+Static pages in `site/docs/`, styled by `docs.css`; `docs.js` adds a Copy button to every `<div class="cmd"><pre>…</pre></div>`. The old `/recipes.html` address redirects to `/docs/recipes.html`.
 
 | Page | What |
 |---|---|
+| `recipes.html` | Recipes: commands for joan-pi (connect, services and ports, deploy, Docker, health, jobs, troubleshooting) |
 | `phone.html` | Android phone backup and cleanup from the Mac, with `phone-dump.sh` (map, copy, verify, delete only what verified) |
 
 To add a page: copy `phone.html` for the header and footer, add it to the list in `docs/index.html`. A script a page hands out lives next to it and is fetched with `curl -fsSO https://home.tailaccc17.ts.net/docs/<script>`. This repo is public: nothing personal (IDs, prices, addresses beyond the tailnet names) goes in a page.
@@ -127,7 +127,7 @@ Everything the Pi does on a clock runs as a systemd timer, defined in `ops/`. Ti
 | Job | When | What |
 |---|---|---|
 | `joanpi-gym-pull` | every 15 min | `git pull` in the Tally checkout |
-| `joanpi-home-pull` | every 15 min | `git pull` in this checkout, so homepage, Pi Recipes and Pi Projects edits show up on their own. Changes under `ops/` or `pichart/` still need the steps in [Update](#update) |
+| `joanpi-home-pull` | every 15 min | `git pull` in this checkout, so homepage, Pi Docs and Pi Projects edits show up on their own. Changes under `ops/` or `pichart/` still need the steps in [Update](#update) |
 | `joanpi-velo-sync` | ~02:40 | Vélothèque's Strava sync (the "Sync now" job; a rate limit just resumes next night) |
 | `joanpi-lux-backup` | 03:10 | Lux Archive's `scripts/backup.sh` (commits and pushes to its data repo) |
 | `velotheque-backup` | ~03:30 | Vélothèque's own Proton backup (its repo's `ops/`); only the status hook is added here |
@@ -178,4 +178,4 @@ then `sudo systemctl restart docker` (this restarts every container) and recreat
 
 ## Adding a service
 
-Add a bubble in `.bubbles` and an entry in `.directory` in `site/index.html`, put its logo in `site/icons/`, add a line to `pichart/services.json`, and a row to the table in `site/recipes.html`.
+Add a bubble in `.bubbles` and an entry in `.directory` in `site/index.html`, put its logo in `site/icons/`, add a line to `pichart/services.json`, and a row to the table in `site/docs/recipes.html`.

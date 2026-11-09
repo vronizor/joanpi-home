@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>Pi Recipes · JoanPi</title>
+<title>Recipes · Pi Docs · JoanPi</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/docs/docs.css">
@@ -14,8 +14,8 @@
 
 <header>
 <span class="home"><a href="/">← JoanPi home</a> · <a href="/docs/">Pi Docs</a></span>
-<h1><span class="pi">Pi</span><span class="rest">Recipes</span></h1>
-<p class="tagline">commands for joan-pi</p>
+<h1><span class="pi">Pi</span><span class="rest">Docs</span></h1>
+<p class="tagline">recipes · commands for joan-pi</p>
 </header>
 
 <p class="toc"><a href="#connect">Connect</a> - <a href="#services">Services &amp; ports</a> - <a href="#deploy">Deploy</a> - <a href="#docker">Docker</a> - <a href="#health">Health</a> - <a href="#network">Network</a> - <a href="#maintenance">Maintenance</a> - <a href="#adguard">AdGuard</a> - <a href="#trouble">Troubleshooting</a></p>
@@ -60,7 +60,7 @@
 <div class="cmd"><pre>cd ~/&lt;repo&gt;
 git pull
 docker compose up -d --build</pre></div>
-<p class="note">The JoanPi homepage and Pi Recipes only need <code>git pull</code>: their files are mounted into nginx, so nothing has to be rebuilt. Pi Chart code changes need <code>docker compose up -d --build pichart</code>.</p>
+<p class="note">The JoanPi homepage and Pi Docs only need <code>git pull</code>: their files are mounted into nginx, so nothing has to be rebuilt. Pi Chart code changes need <code>docker compose up -d --build pichart</code>.</p>
 <h3>Third-party images (AdGuard, Baby Buddy…)</h3>
 <div class="cmd"><pre>cd ~/docker/&lt;service&gt;
 docker compose pull
