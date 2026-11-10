@@ -6,7 +6,7 @@ reclaimed() { { grep -E '^Total' || true; } | tail -n 1 | sed -E 's/^[^:]*:[[:sp
 # Capture then print: under systemd stderr is a journald socket, and `tee /dev/stderr` can't reopen it (ENXIO).
 image_out="$(docker image prune -f)"
 printf '%s\n' "$image_out"
-cache_out="$(docker builder prune -f --filter until=168h)"
+cache_out="$(docker builder prune -af --filter until=168h)"
 printf '%s\n' "$cache_out"
 images="$(reclaimed <<<"$image_out")"
 cache="$(reclaimed <<<"$cache_out")"
