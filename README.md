@@ -132,7 +132,7 @@ Everything the Pi does on a clock runs as a systemd timer, defined in `ops/`. Ti
 | `joanpi-lux-backup` | 03:10 | Lux Archive's `scripts/backup.sh` (commits and pushes to its data repo) |
 | `velotheque-backup` | ~03:30 | Vélothèque's own Proton backup (its repo's `ops/`); only the status hook is added here |
 | `joanpi-backup` | ~04:15 | Proton Drive backup of the sources in `/etc/joanpi/backup.toml` |
-| `joanpi-docker-prune` | Sun 05:00 | dangling images and build cache unused for a week |
+| `joanpi-docker-prune` | Sun 05:00 | dangling images; build cache trimmed to the 2 GB most recently used |
 
 Apps that schedule their own work (Telex pulls, Kiosk digests, Double Feature refreshes) keep showing it on their own pages.
 
