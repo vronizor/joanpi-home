@@ -65,23 +65,49 @@ h1 .pi {
   text-transform: uppercase;
   color: #444444;
 }
-.bubbles {
+.services {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  border: 1px solid #808080;
+  box-shadow: 3px 3px 0 #c4c4c4;
+  overflow: hidden;
+}
+.services-bar {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px 4px;
-  background: linear-gradient(#c8c8c8, #c8c8c8) no-repeat center 33px / calc(100% - 120px) 4px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: #cc0000;
+  border-bottom: 1px solid #808080;
+  color: #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+}
+.services-bar .count { font-size: 12px; font-weight: normal; }
+.bubbles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  width: calc(100% + 1px);
+  margin-bottom: -1px;
 }
 .bubble {
-  width: 92px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
+  padding: 12px 4px 10px;
+  background: #ffffff;
+  box-shadow: inset -1px -1px 0 #c0c0c0;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 13px;
   text-align: center;
 }
+.bubble:nth-child(10n+6), .bubble:nth-child(10n+7), .bubble:nth-child(10n+8),
+.bubble:nth-child(10n+9), .bubble:nth-child(10n+10) { background: #f2f2f2; }
+.bubble:focus-visible { outline-offset: -4px; }
 .disc {
   position: relative;
   width: 66px;
@@ -131,8 +157,9 @@ h1 .pi {
 .sub { font-size: 16px; }
 .tag { font-size: 15px; font-weight: bold; margin-left: 6px; }
 @media (max-width: 700px) {
-  .bubbles { background: none; }
-  .bubble { width: 84px; }
+  .bubble { padding: 10px 2px 8px; font-size: 11px; }
+  .disc { width: 50px; height: 50px; }
+  .disc img { width: 32px; height: 32px; border-radius: 7px; }
 }
 footer {
   margin-top: 18px;
@@ -159,6 +186,8 @@ footer {
 
 <p class="alert" id="jobs-alert" hidden></p>
 
+<section class="services">
+<div class="services-bar"><span>Services</span><span class="count" id="services-count"></span></div>
 <nav class="bubbles" aria-label="Services">
 <a class="bubble" href="https://babybuddy.tailaccc17.ts.net/">
 <span class="disc"><span class="fallback" aria-hidden="true">BB</span><img class="ext" src="https://babybuddy.tailaccc17.ts.net/apple-touch-icon.png" alt="" onerror="this.remove()"></span>
@@ -201,6 +230,7 @@ footer {
 <span>AdGuard</span>
 </a>
 </nav>
+</section>
 
 <nav class="directory" aria-label="Pages">
 
@@ -285,6 +315,8 @@ footer {
 
 </div>
 <script>
+document.getElementById("services-count").textContent =
+  `${document.querySelectorAll(".bubbles .bubble").length} on the tailnet`;
 fetch("/chart/api/jobs", { cache: "no-store" })
   .then((r) => (r.ok ? r.json() : null))
   .then((d) => {
