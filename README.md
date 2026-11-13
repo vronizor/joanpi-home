@@ -1,6 +1,6 @@
 # JoanPi home
 
-The homepage for the services on joan-pi, a late-90s portal page with a link to each service on the tailnet, plus companion pages:
+The homepage for the services on joan-pi, a late-90s portal page with a link to each service on the tailnet and a search box that jumps straight to any of them, plus companion pages:
 
 - **Pi Docs** (`/docs/`): reference pages written down once so they don't have to be worked out again, including Recipes, the Pi's command reference.
 - **Pi Chart** (`/chart/`): the Pi's health, live and over the last 48 hours.
@@ -17,6 +17,10 @@ compose.yaml           two containers: home (nginx) and pichart
 ```
 
 Baby Buddy's and AdGuard Home's icons are not copied here: the homepage loads them from those instances, and shows the app's initials if that fails.
+
+## Search
+
+The box under the wordmark jumps to any link in the directory or the footer: type, then ↵ or Go!. It matches the link text, the service name, initials (`df`, `rc`), and the comma-separated `data-keys` on each link, so `gpx` finds *Import a route*. To make a page findable, add it to the directory with a `data-keys` attribute; there is no second list. When nothing matches, Go! does nothing. Picks are remembered per browser (`localStorage`, key `joanpi-search-picks`) and push that result up for the same query next time.
 
 ## Deploy
 
