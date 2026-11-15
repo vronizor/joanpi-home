@@ -369,6 +369,7 @@ function renderHistory() {
   if (latest) renderNow();
 }
 
+const JOB_GROUPS = { problem: "Needs a look", daily: "Daily and weekly", frequent: "Every few minutes" };
 const JOB_STATE = { ok: ["● OK", "ok"], failed: ["● Failed", "bad"], overdue: ["● Overdue", "warn"] };
 
 function ago(seconds) {
@@ -394,14 +395,17 @@ async function refreshJobs() {
     box.innerHTML = '<p class="empty" style="padding: 6px 8px; margin: 0">No job has reported yet. Run <code>sudo ops/install.sh</code> from the joanpi-home checkout.</p>';
     return;
   }
+  let group = null;
   box.innerHTML = data.jobs.map((j) => {
     const [text, cls] = JOB_STATE[j.state];
+    const head = j.group !== group && JOB_GROUPS[j.group] ? `<div class="jobs-group">${JOB_GROUPS[j.group]}</div>` : "";
+    group = j.group;
     const last = j.finished ? `last ${esc(when(j.finished))} (${ago(data.time - j.finished)})${j.duration_s != null ? `, took ${took(j.duration_s)}` : ""}` : "never ran";
     const next = j.next ? ` · next ${esc(when(j.next))}` : "";
     const lastOk = !j.ok && j.last_success ? ` · last success ${ago(data.time - j.last_success)}` : !j.ok ? " · no success recorded" : "";
     const says = j.summary ? `<div class="meta says">${esc(j.summary)}</div>` : "";
     const log = (j.log || []).length ? `<pre>${esc(j.log.join("\n"))}</pre>` : '<pre>(no output)</pre>';
-    return `<details class="job" data-job="${esc(j.job)}"${open.has(j.job) ? " open" : ""}><summary>
+    return `${head}<details class="job${j.group === "frequent" ? " frequent" : ""}" data-job="${esc(j.job)}"${open.has(j.job) ? " open" : ""}><summary>
 <span class="state ${cls}">${text}</span>
 <span class="title">${esc(j.description || j.job)}</span>
 <span class="meta">${last}${next}${lastOk}</span>

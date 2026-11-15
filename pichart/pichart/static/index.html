@@ -88,8 +88,12 @@ figcaption span { font-weight: normal; font-size: 15px; color: #444444; }
 .empty { font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #444444; }
 .jobs { border: 1px solid #808080; }
 .job { border-top: 1px solid #c0c0c0; }
-.job:first-child { border-top: 0; }
-.job:nth-child(odd) { background: #f2f2f2; }
+.job:first-child, .jobs-group + .job { border-top: 0; }
+.job:nth-of-type(odd) { background: #f2f2f2; }
+.jobs-group { padding: 3px 8px; background: #dcdcdc; border-top: 1px solid #808080; font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #444444; }
+.jobs-group:first-child { border-top: 0; }
+.job.frequent > summary { padding: 4px 8px; }
+.job.frequent .title { font-size: 14px; }
 .job > summary { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 2px 10px; padding: 6px 8px; cursor: pointer; list-style: none; }
 .job > summary::-webkit-details-marker { display: none; }
 .job > summary > :not(.state) { grid-column: 2; }
@@ -164,7 +168,7 @@ footer { margin-top: 12px; padding-top: 14px; border-top: 1px solid #c0c0c0; dis
 
 <h2 id="jobs-title">Scheduled jobs</h2>
 <div class="jobs" id="jobs"><p class="empty">Loading…</p></div>
-<p class="note">Timers on the Pi itself (systemd), newest result of each. Tap a job for the end of its last run's output; the full log is <code>journalctl -u &lt;job&gt;</code>. A job is overdue when its next run is more than an hour late. Jobs that apps run themselves (Telex pulls, Kiosk digests, Double Feature refreshes) show on their own pages.</p>
+<p class="note">Timers on the Pi itself (systemd), newest result of each: problems first, then the daily and weekly jobs, then the ones that run every few minutes, each group in alphabetical order so rows stay put. Tap a job for the end of its last run's output; the full log is <code>journalctl -u &lt;job&gt;</code>. A job is overdue when its next run is more than an hour late. Jobs that apps run themselves (Telex pulls, Kiosk digests, Double Feature refreshes) show on their own pages.</p>
 
 <h2>Last 48 hours</h2>
 <div class="legend">
