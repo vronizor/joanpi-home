@@ -41,7 +41,7 @@ git push origin v1.4</pre></div>
 <li><i>Choose a tag</i>: type <code>v1.4</code>, pick <i>Create new tag on publish</i>, target <code>main</code>.</li>
 <li><i>Publish release</i>. The notes are optional.</li>
 </ul>
-<p class="note">Or ask Claude to tag it in a session on that repo. Tagging stays a deliberate step: Claude pushing to main deploys nothing.</p>
+<p class="note">Claude in the app can push to main but can't create tags or releases, so tagging stays your step: Claude pushing to main deploys nothing. Claude Code on the laptop can tag when you ask.</p>
 <h3>Tag names</h3>
 <ul>
 <li><code>v</code> + numbers and dots: <code>v1.4</code>, <code>v1.4.1</code>, <code>v2</code>. Anything else (<code>v1.5-rc1</code>, <code>latest</code>) is ignored, so it can be used to mark things without deploying them.</li>
