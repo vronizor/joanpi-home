@@ -21,6 +21,10 @@ if [ ! -f "$etc/backup.toml" ]; then
   install -m 644 "$ops/backup.toml.example" "$etc/backup.toml"
   echo "created $etc/backup.toml"
 fi
+if [ ! -f "$etc/deploy.toml" ]; then
+  install -m 644 "$ops/deploy.toml.example" "$etc/deploy.toml"
+  echo "created $etc/deploy.toml"
+fi
 set -a; . "$etc/ops.env"; set +a
 
 velo_env=/etc/velotheque/backup.env
@@ -34,9 +38,22 @@ else
 fi
 
 install -d -m 755 "$lib" /var/lib/joanpi /var/lib/joanpi/jobs
-install -m 755 "$ops"/lib/job_status.py "$ops"/lib/joanpi_backup.py "$ops"/lib/velo-sync.sh "$ops"/lib/docker-prune.sh "$lib/"
+install -m 755 "$ops"/lib/job_status.py "$ops"/lib/joanpi_backup.py "$ops"/lib/velo-sync.sh "$ops"/lib/docker-prune.sh "$ops"/lib/joanpi_deploy.py "$lib/"
 
 timers=(joanpi-velo-sync joanpi-lux-backup joanpi-gym-pull joanpi-home-pull joanpi-docker-prune)
+if sudo -u "$OWNER" docker compose up --help 2>/dev/null | grep -q -- --wait-timeout; then
+  timers+=(joanpi-deploy)
+  install -d -o "$OWNER" -g "$OWNER" -m 755 /var/lib/joanpi/deploy
+  cat > /usr/local/bin/deploy <<EOF
+#!/usr/bin/env bash
+set -a; . /etc/joanpi/ops.env; set +a
+if [ "\$(id -u)" = 0 ]; then exec sudo -u "$OWNER" -H OWNER_HOME="$OWNER_HOME" /usr/bin/python3 $lib/joanpi_deploy.py "\$@"; fi
+exec /usr/bin/python3 $lib/joanpi_deploy.py "\$@"
+EOF
+  chmod 755 /usr/local/bin/deploy
+else
+  echo "skipped joanpi-deploy: needs Docker Compose 2.17 or newer (docker compose version)"
+fi
 [ "$backup" = yes ] && timers+=(joanpi-backup)
 if [ -d "$OWNER_HOME/pi-projects-data/.git" ]; then
   timers+=(joanpi-projects-pull)
@@ -72,6 +89,19 @@ fi
 systemctl daemon-reload
 for job in "${timers[@]}"; do systemctl enable --now "$job.timer" > /dev/null; done
 systemctl list-timers 'joanpi-*' 'velotheque-*' --no-pager
+
+if [ -x /usr/local/bin/deploy ]; then
+  echo
+  echo "Apps deployed from tags ($etc/deploy.toml):"
+  sudo -u "$OWNER" OWNER_HOME="$OWNER_HOME" python3 - "$etc/deploy.toml" <<'PY'
+import os, sys, tomllib
+from pathlib import Path
+home = Path(os.environ["OWNER_HOME"])
+for name, conf in tomllib.loads(Path(sys.argv[1]).read_text()).get("repos", {}).items():
+    d = home / conf["dir"]
+    print(f"  {name:10} {d}  {'ok' if (d / '.git').is_dir() else 'NOT FOUND: fix dir or remove the entry'}")
+PY
+fi
 
 old="$(crontab -u "$OWNER" -l 2>/dev/null | grep -E 'gym && git pull|lux-archive/scripts/backup\.sh' || true)"
 if [ -n "$old" ]; then

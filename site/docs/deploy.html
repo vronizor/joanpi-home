@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Deploys · Pi Docs · JoanPi</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<div class="page">
+
+<header>
+<span class="home"><a href="/">← JoanPi home</a> · <a href="/docs/">Pi Docs</a></span>
+<h1><a class="logo" href="/"><span class="pi">Pi</span><span class="rest">Docs</span></a></h1>
+<p class="tagline">deploys · tag a release, the pi picks it up</p>
+</header>
+
+<p class="toc"><a href="#how">How it works</a> - <a href="#release">Release a version</a> - <a href="#watch">Is it live?</a> - <a href="#hand">By hand on the Pi</a> - <a href="#stuck">When it doesn't deploy</a> - <a href="#apps">Which apps</a> - <a href="#install">Install</a></p>
+
+<p>The rule: <b>a push to main deploys nothing, a version tag deploys.</b> Push as often as you like. When a state of main should go live, tag it <code>v1.4</code> and the Pi deploys it within 5 minutes, even when you're away.</p>
+
+<h2 id="how">How it works</h2>
+<ul>
+<li>Every 5 minutes the <code>joanpi-deploy</code> job asks GitHub which <code>v*</code> tags each app has. That is one small request per app, a few KB; nothing is downloaded when nothing changed.</li>
+<li>If an app has a tag newer than the last one it saw, it fetches, checks the checkout out <b>at that tag</b> and runs <code>docker compose up -d --build</code>.</li>
+<li>Then it checks the release: every container has to be running (and healthy, if it has a health check), still running 15 seconds later, and the app's port has to answer.</li>
+<li>If the check fails, it goes back to the version that was running before and rebuilds it. The failed tag is not tried again. A newer tag, or a deploy by hand, takes over.</li>
+</ul>
+<p class="note">At a tag, the checkout isn't on a branch ("detached"). That's on purpose: the folder holds exactly the tagged code. So in these folders, <b>don't <code>git pull</code> or <code>git checkout</code> by hand any more</b>. Use <code>deploy</code> (below), which keeps track of what is running.</p>
+
+<h2 id="release">Release a version</h2>
+<h3>From the laptop</h3>
+<div class="cmd"><pre>git tag v1.4
+git push origin v1.4</pre></div>
+<h3>From the phone</h3>
+<ul>
+<li>GitHub → the repo → <i>Releases</i> → <i>Draft a new release</i>.</li>
+<li><i>Choose a tag</i>: type <code>v1.4</code>, pick <i>Create new tag on publish</i>, target <code>main</code>.</li>
+<li><i>Publish release</i>. The notes are optional.</li>
+</ul>
+<p class="note">Or ask Claude to tag it in a session on that repo. Tagging stays a deliberate step: Claude pushing to main deploys nothing.</p>
+<h3>Tag names</h3>
+<ul>
+<li><code>v</code> + numbers and dots: <code>v1.4</code>, <code>v1.4.1</code>, <code>v2</code>. Anything else (<code>v1.5-rc1</code>, <code>latest</code>) is ignored, so it can be used to mark things without deploying them.</li>
+<li>"Newer" means a higher number, not a later date: <code>v1.10</code> comes after <code>v1.9</code>. A tag lower than the one running is ignored.</li>
+<li>Never move or reuse a tag. To fix a release, make a new one (<code>v1.4.1</code>).</li>
+</ul>
+
+<h2 id="watch">Is it live?</h2>
+<ul>
+<li><a href="/chart/#jobs-title">Pi Chart → Jobs</a>, line <i>Deploy new release tags of the apps</i>: the last run's summary (<code>6 up to date · kiosk v1.4 ok</code>) and its log.</li>
+<li>When something needs you, that job shows as failed, and the homepage shows its red line until it's sorted out.</li>
+<li>On the Pi: <code>deploy status</code>.</li>
+</ul>
+<div class="scroll">
+<table>
+<tr><th>Result</th><th>Meaning</th><th>Running now</th></tr>
+<tr><td><code>ok</code></td><td>Deployed and answering</td><td>the new tag</td></tr>
+<tr><td><code>rolled-back</code></td><td>The release built or started badly; the message says why</td><td>the previous version</td></tr>
+<tr><td><code>down</code></td><td>Failed, and going back failed too</td><td>possibly nothing: look now</td></tr>
+<tr><td><code>held</code></td><td>The release changes something listed under <code>hold</code> (Vélothèque's database migrations)</td><td>the previous version</td></tr>
+<tr><td><code>blocked</code></td><td>The release adds a setting to <code>.env.example</code> that <code>.env</code> doesn't have yet, or files in the checkout were edited by hand</td><td>the previous version</td></tr>
+</table>
+</div>
+
+<h2 id="hand">By hand on the Pi</h2>
+<h3>What runs where</h3>
+<div class="cmd"><pre>deploy status</pre></div>
+<h3>Deploy the newest tag now (no 5-minute wait; also retries a failed or held tag)</h3>
+<div class="cmd"><pre>deploy kiosk</pre></div>
+<h3>A precise version, main, or back to an older tag</h3>
+<div class="cmd"><pre>deploy kiosk v1.4
+deploy kiosk main
+deploy kiosk v1.3</pre></div>
+<p class="note"><code>deploy kiosk main</code> is for trying out untagged code on the Pi; it shows as <code>main@abc1234</code>. It stays until the next new tag. The same checks and rollback apply as for the automatic run.</p>
+<h3>Log of the automatic runs</h3>
+<div class="cmd"><pre>journalctl -u joanpi-deploy -n 50</pre></div>
+
+<h2 id="stuck">When it doesn't deploy</h2>
+<h3>Rolled back</h3>
+<p>Read the reason in <code>deploy status</code>, then the app's own log:</p>
+<div class="cmd"><pre>cd ~/inkbook-digest &amp;&amp; docker compose logs --tail 50</pre></div>
+<p class="note">Fix it on main and tag a new version. The rollback restores the code, not the data: if the release had already changed a database when it failed, the old version may not like it. That's why Vélothèque's migrations are held.</p>
+<h3>Held</h3>
+<p>The release migrates a database. Deploy it when you can watch, ideally right after a backup:</p>
+<div class="cmd"><pre>deploy velo</pre></div>
+<h3>Blocked: a new setting</h3>
+<div class="cmd"><pre>cd ~/inkbook-digest
+git diff HEAD v1.4 -- .env.example
+nano .env
+deploy kiosk</pre></div>
+<h3>Blocked: edited by hand</h3>
+<div class="cmd"><pre>cd ~/inkbook-digest &amp;&amp; git status
+git stash</pre></div>
+<p class="note">Then <code>deploy kiosk</code>. <code>git stash list</code> keeps the edits in case they mattered; anything worth keeping belongs in the repo.</p>
+<h3>Check failed several times in a row</h3>
+<p>The Pi couldn't ask GitHub for 30 minutes: no internet, or the repo's key or URL broke. Try it yourself:</p>
+<div class="cmd"><pre>cd ~/telex &amp;&amp; git ls-remote --tags origin</pre></div>
+
+<h2 id="apps">Which apps</h2>
+<p>The list is <code>/etc/joanpi/deploy.toml</code>: Telex, Vélothèque, BabyDash, Kiosk, Double Feature, Regularity Conditions and Lux Archive. The name to type is the left column of <code>deploy status</code> (<code>telex</code>, <code>velo</code>, <code>babydash</code>, <code>kiosk</code>, <code>cine</code>, <code>econ</code>, <code>lux</code>); the folder name works too.</p>
+<p>Still updated another way:</p>
+<ul>
+<li><b>JoanPi home and Tally</b> follow main on their own every 15 minutes (<code>joanpi-home-pull</code>, <code>joanpi-gym-pull</code>): they're pages, nothing to build.</li>
+<li><b>Pi Chart's code</b> and anything under <code>ops/</code> in this repo: see <a href="/docs/recipes.html#deploy">Recipes → Deploy</a>.</li>
+<li><b>Vélothèque's <code>ops/</code></b> (its backup job): <code>sudo ops/install-backup.sh</code> after a release that changes it.</li>
+<li><b>AdGuard and Baby Buddy</b>: third-party images, updated by hand.</li>
+</ul>
+<h3>Add an app</h3>
+<div class="cmd"><pre>sudo nano /etc/joanpi/deploy.toml</pre></div>
+<p class="note">A <code>[repos.name]</code> block with <code>dir</code> (folder in the home folder) and <code>port</code>. Its first check records the version that's running and deploys nothing; tags after that deploy.</p>
+
+<h2 id="install">Install (once)</h2>
+<p>Each app's checkout should be clean (<code>git status</code> shows no edited files). Then:</p>
+<div class="cmd"><pre>cd ~/joanpi-home &amp;&amp; git pull &amp;&amp; sudo ops/install.sh</pre></div>
+<p class="note">It creates <code>/etc/joanpi/deploy.toml</code>, the <code>deploy</code> command and the 5-minute timer, and lists each app with <code>ok</code> or <code>NOT FOUND</code>. For a NOT FOUND, fix its <code>dir</code> in <code>/etc/joanpi/deploy.toml</code>. It needs Docker Compose 2.17 or newer, and says so if the Pi's is older.</p>
+<p class="note">The first run deploys nothing: it records what each app runs and its newest tag. Only tags made after that deploy. Double Feature already has tags up to <code>v9.0.0</code>, so its next release is <code>v9.1</code> or higher.</p>
+
+<footer>
+<span><a href="/">JoanPi home</a> - <a href="/docs/">Pi Docs</a> - <a href="/docs/recipes.html">Recipes</a> - <a href="/chart/">Pi Chart</a></span>
+<span>Copyright © 2026 JoanPi. Tailnet only.</span>
+</footer>
+
+</div>
+<script src="/docs/docs.js"></script>
+</body>
+</html>

@@ -34,6 +34,7 @@ The box under the wordmark jumps to any link in the directory or the footer: typ
 - Pi Chart code: `git pull && docker compose up -d --build pichart`.
 - `services.json` only: `docker compose restart pichart`.
 - Anything under `ops/`: `git pull && sudo ops/install.sh`.
+- The apps themselves (Telex, Vélothèque, Kiosk…): push a `v*` tag; `joanpi-deploy` deploys it within 5 minutes. See `site/docs/deploy.html`.
 
 ## Pi Docs
 
@@ -41,6 +42,7 @@ Static pages in `site/docs/`, styled by `docs.css`; `docs.js` adds a Copy button
 
 | Page | What |
 |---|---|
+| `deploy.html` | Deploys: release tags, what the Pi does with them, what to do when one doesn't go live |
 | `recipes.html` | Recipes: commands for joan-pi (connect, services and ports, deploy, Docker, health, jobs, troubleshooting) |
 | `phone.html` | Android phone backup and cleanup from the Mac, with `phone-dump.sh` (map, copy, verify, delete only what verified) |
 
@@ -122,7 +124,7 @@ Containers are matched to services by name or by compose project and service. A 
 
 **Access:** Pi Chart runs with the host's network and process view, and mounts the Docker socket read-only. Read-only on the socket file doesn't limit what the API allows, so this container is effectively root on the Pi. It only answers GET requests, only on `127.0.0.1`, and is only reachable through the tailnet.
 
-Tests: `cd pichart && python -m unittest tests/test_pichart.py`.
+Tests: `cd pichart && python -m unittest tests/test_pichart.py`; for `ops/`: `cd ops && python -m unittest discover tests`.
 
 ## Scheduled jobs
 
@@ -132,6 +134,7 @@ Everything the Pi does on a clock runs as a systemd timer, defined in `ops/`. Ti
 |---|---|---|
 | `joanpi-gym-pull` | every 15 min | `git pull` in the Tally checkout |
 | `joanpi-home-pull` | every 15 min | `git pull` in this checkout, so homepage, Pi Docs and Pi Projects edits show up on their own. Changes under `ops/` or `pichart/` still need the steps in [Update](#update) |
+| `joanpi-deploy` | every 5 min | deploys new `v*` release tags of the apps in `/etc/joanpi/deploy.toml`, with a check and a rollback (`ops/lib/joanpi_deploy.py`, see [Deploys](site/docs/deploy.html)) |
 | `joanpi-velo-sync` | ~02:40 | Vélothèque's Strava sync (the "Sync now" job; a rate limit just resumes next night) |
 | `joanpi-lux-backup` | 03:10 | Lux Archive's `scripts/backup.sh` (commits and pushes to its data repo) |
 | `velotheque-backup` | ~03:30 | Vélothèque's own Proton backup (its repo's `ops/`); only the status hook is added here |

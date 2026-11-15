@@ -56,11 +56,14 @@
 <div class="cmd"><pre>tailscale status</pre></div>
 
 <h2 id="deploy">Deploy</h2>
-<h3>My apps (code in a git repo in the home folder)</h3>
-<div class="cmd"><pre>cd ~/&lt;repo&gt;
-git pull
-docker compose up -d --build</pre></div>
-<p class="note">The JoanPi homepage and Pi Docs only need <code>git pull</code>: their files are mounted into nginx, so nothing has to be rebuilt. Pi Chart code changes need <code>docker compose up -d --build pichart</code>.</p>
+<h3>My apps: tag a release, the Pi deploys it</h3>
+<div class="cmd"><pre>git tag v1.4 &amp;&amp; git push origin v1.4
+deploy status
+deploy kiosk</pre></div>
+<p class="note">The first line runs on the laptop; the Pi picks the tag up within 5 minutes. <code>deploy kiosk</code> deploys right away. Don't <code>git pull</code> in these checkouts any more. Everything else: <a href="/docs/deploy.html">Deploys</a>.</p>
+<h3>JoanPi home, Pi Docs, Tally</h3>
+<p>Nothing to do: they follow main every 15 minutes. Pi Chart code changes need:</p>
+<div class="cmd"><pre>cd ~/joanpi-home &amp;&amp; git pull &amp;&amp; docker compose up -d --build pichart</pre></div>
 <h3>Third-party images (AdGuard, Baby Buddy…)</h3>
 <div class="cmd"><pre>cd ~/docker/&lt;service&gt;
 docker compose pull

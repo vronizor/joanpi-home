@@ -1,0 +1,38 @@
+# /etc/joanpi/deploy.toml — the apps deployed from release tags (joanpi-deploy)
+#
+# [repos.NAME]   NAME is what you type: deploy NAME
+# dir   checkout, relative to the owner's home folder
+# port  local port that must answer after a deploy (optional)
+# hold  paths that stop an automatic deploy when a release changes them;
+#       deploy those by hand with: deploy NAME TAG
+#
+# JoanPi home and Tally are not here: they follow main on their own (joanpi-home-pull, joanpi-gym-pull).
+
+[repos.telex]
+dir = "telex"
+port = 8020
+
+[repos.velo]
+dir = "velotheque"
+port = 8010
+hold = ["src/velotheque/migrations/versions/"]
+
+[repos.babydash]
+dir = "baby-dash"
+port = 8001
+
+[repos.kiosk]
+dir = "inkbook-digest"
+port = 8080
+
+[repos.cine]
+dir = "double-feature"
+port = 8090
+
+[repos.econ]
+dir = "regularity-conditions"
+port = 8095
+
+[repos.lux]
+dir = "lux-archive"
+port = 8060

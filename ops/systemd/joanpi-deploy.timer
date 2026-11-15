@@ -1,0 +1,9 @@
+[Unit]
+Description=Check for new release tags every 5 minutes
+
+[Timer]
+OnBootSec=5min
+OnCalendar=*:3/5
+
+[Install]
+WantedBy=timers.target
