@@ -117,7 +117,7 @@ git stash</pre></div>
 <p>Each app's checkout should be clean (<code>git status</code> shows no edited files). Then:</p>
 <div class="cmd"><pre>cd ~/joanpi-home &amp;&amp; git pull &amp;&amp; sudo ops/install.sh</pre></div>
 <p class="note">It creates <code>/etc/joanpi/deploy.toml</code>, the <code>deploy</code> command and the 5-minute timer, and lists each app with <code>ok</code> or <code>NOT FOUND</code>. For a NOT FOUND, fix its <code>dir</code> in <code>/etc/joanpi/deploy.toml</code>. It needs Docker Compose 2.17 or newer, and says so if the Pi's is older.</p>
-<p class="note">The first run deploys nothing: it records what each app runs and its newest tag. Only tags made after that deploy. Double Feature already has tags up to <code>v9.0.0</code>, so its next release is <code>v9.1</code> or higher.</p>
+<p class="note">The first run deploys nothing: it records what each app runs and its newest tag. Only tags made after that deploy. Double Feature already has tags up to <code>v10.0.0</code>, so its next release is <code>v10.1</code> or higher.</p>
 
 <footer>
 <span><a href="/">JoanPi home</a> - <a href="/docs/">Pi Docs</a> - <a href="/docs/recipes.html">Recipes</a> - <a href="/chart/">Pi Chart</a></span>

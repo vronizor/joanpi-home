@@ -63,8 +63,9 @@ def run(cmd: list[str], cwd: Path, timeout: int = 300) -> str:
     except subprocess.TimeoutExpired:
         raise DeployError(f"{' '.join(cmd[:3])} timed out after {timeout}s")
     if r.returncode:
-        err = (r.stderr.strip() or r.stdout.strip()).splitlines()
-        raise DeployError(f"{' '.join(cmd[:3])}: {err[-1] if err else 'exit ' + str(r.returncode)}")
+        err = [l.strip() for l in (r.stderr or r.stdout).splitlines() if l.strip()]
+        key = next((l for l in err if re.search(r"denied|not found|fatal|error", l, re.I)), err[-1] if err else None)
+        raise DeployError(f"{' '.join(cmd[:3])}: {key or 'exit ' + str(r.returncode)}")
     return r.stdout
 
 
