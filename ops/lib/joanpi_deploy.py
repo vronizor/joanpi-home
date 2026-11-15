@@ -320,13 +320,17 @@ def main(argv: list[str]) -> int:
             print(f"{name}: skipped, {repo.dir} not found")
             continue
         before = st.get("last")
+        failed = False
         try:
             check(repo, st, log)
         except DeployError as e:
+            failed = True
             st["check_fails"] = st.get("check_fails", 0) + 1
             log(f"{name}: check failed ({st['check_fails']} in a row): {e}")
         last = st.get("last")
-        if last is not before:
+        if failed:
+            events.append(f"{name} check failed ({st['check_fails']} in a row)")
+        elif last is not before:
             events.append(f"{name} {last['ref']} {last['result']}")
         elif needs_attention(st):
             events.append(f"{name} needs you")
