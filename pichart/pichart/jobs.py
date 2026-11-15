@@ -18,8 +18,10 @@ def job_state(job: dict, now: float) -> str:
 def job_group(job: dict) -> str:
     if job["state"] != "ok":
         return "problem"
-    nxt, start = job.get("next"), job.get("started") or job.get("finished")
-    if nxt and start and nxt - start <= FREQUENT_S:
+    interval = job.get("interval_s")
+    if interval is None and job.get("next") and (job.get("started") or job.get("finished")):
+        interval = job["next"] - (job.get("started") or job["finished"])
+    if interval is not None and interval <= FREQUENT_S:
         return "frequent"
     return "daily"
 

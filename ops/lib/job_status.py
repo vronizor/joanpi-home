@@ -7,6 +7,7 @@ $JOANPI_JOBS_DIR/<job>.json (default /var/lib/joanpi/jobs). Standard library onl
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -35,6 +36,33 @@ def unix(value: str | None) -> int | None:
     return None
 
 
+def calendar_specs(unit_text: str) -> list[str]:
+    specs: list[str] = []
+    for line in unit_text.splitlines():
+        m = re.match(r"\s*OnCalendar\s*=\s*(.*?)\s*$", line)
+        if m:
+            specs = [] if not m.group(1) else specs + [m.group(1)]
+    return specs
+
+
+def utc_elapses(analyze_output: str) -> list[int]:
+    out = []
+    for m in re.finditer(r"\(in UTC\):\s*\w+ (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) UTC", analyze_output):
+        out.append(int(datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC).timestamp()))
+    return out
+
+
+def schedule(timer_unit: str) -> tuple[int | None, int | None]:
+    text = subprocess.run(["systemctl", "cat", timer_unit], capture_output=True, text=True).stdout
+    best: tuple[int | None, int | None] = (None, None)
+    for spec in calendar_specs(text):
+        out = subprocess.run(["systemd-analyze", "calendar", "--iterations=2", spec], capture_output=True, text=True).stdout
+        times = utc_elapses(out)
+        if len(times) == 2 and (best[0] is None or times[0] < best[0]):
+            best = (times[0], times[1] - times[0])
+    return best
+
+
 def journal(invocation: str | None, unit: str, since: int | None) -> list[str]:
     subprocess.run(["journalctl", "--sync"], capture_output=True)
     if invocation:
@@ -49,7 +77,8 @@ def journal(invocation: str | None, unit: str, since: int | None) -> list[str]:
     return result.stdout.splitlines()
 
 
-def build_status(job: str, env: dict, service: dict, timer: dict, lines: list[str], previous: dict, now: int) -> dict:
+def build_status(job: str, env: dict, service: dict, timer: dict, lines: list[str], previous: dict, now: int,
+                 sched: tuple[int | None, int | None] = (None, None)) -> dict:
     result = env.get("SERVICE_RESULT", "unknown")
     ok = result == "success"
     started = unix(service.get("InactiveExitTimestamp")) or unix(service.get("ExecMainStartTimestamp"))
@@ -63,7 +92,8 @@ def build_status(job: str, env: dict, service: dict, timer: dict, lines: list[st
         "started": started,
         "finished": now,
         "duration_s": now - started if started else None,
-        "next": unix(timer.get("NextElapseUSecRealtime")),
+        "next": unix(timer.get("NextElapseUSecRealtime")) or sched[0],
+        "interval_s": sched[1],
         "summary": summary,
         "log": [line for line in lines if not line.startswith(SUMMARY)][-LOG_LINES:],
         "last_success": now if ok else previous.get("last_success"),
@@ -93,7 +123,7 @@ def main() -> int:
     started = unix(service.get("InactiveExitTimestamp"))
     lines = journal(os.environ.get("INVOCATION_ID"), f"{job}.service", started)
     now = int(datetime.now(UTC).timestamp())
-    write_status(path, build_status(job, dict(os.environ), service, timer, lines, previous, now))
+    write_status(path, build_status(job, dict(os.environ), service, timer, lines, previous, now, schedule(f"{job}.timer")))
     return 0
 
 

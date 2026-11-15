@@ -1,6 +1,7 @@
 import json
 import shutil
 import sqlite3
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -189,6 +190,33 @@ class JobStatusTest(unittest.TestCase):
         self.assertEqual(status["next"], 90000)
         self.assertEqual(status["summary"], "kiosk uploaded")
         self.assertEqual(status["log"], ["starting", "done"])
+
+    def test_schedule_from_timer_when_systemd_has_no_next_yet(self):
+        status = job_status.build_status("joanpi-deploy", {"SERVICE_RESULT": "success"}, {}, {}, [], {}, 1060, (1300, 300))
+        self.assertEqual((status["next"], status["interval_s"]), (1300, 300))
+
+    def test_calendar_specs_follow_resets(self):
+        unit = "[Timer]\nOnBootSec=5min\nOnCalendar=daily\n# drop-in\n[Timer]\nOnCalendar=\nOnCalendar=*:3/5\n"
+        self.assertEqual(job_status.calendar_specs(unit), ["*:3/5"])
+
+    def test_utc_elapses(self):
+        out = """  Original form: *:3/5
+Normalized form: *-*-* *:03/5:00
+    Next elapse: Sun 2026-11-15 20:58:00 CET
+       (in UTC): Sun 2026-11-15 19:58:00 UTC
+       From now: 59s left
+   Iteration #2: Sun 2026-11-15 21:03:00 CET
+       (in UTC): Sun 2026-11-15 20:03:00 UTC
+"""
+        a, b = job_status.utc_elapses(out)
+        self.assertEqual(b - a, 300)
+
+    @unittest.skipUnless(shutil.which("systemd-analyze"), "needs systemd-analyze")
+    def test_utc_elapses_real_output(self):
+        for spec, interval in (("*:3/5", 300), ("*-*-* 03:10:00", 86400), ("Sun *-*-* 05:00:00", 604800)):
+            out = subprocess.run(["systemd-analyze", "calendar", "--iterations=2", spec], capture_output=True, text=True).stdout
+            a, b = job_status.utc_elapses(out)
+            self.assertEqual(b - a, interval, spec)
 
     def test_write_is_atomic_and_readable(self):
         with tempfile.TemporaryDirectory() as d:

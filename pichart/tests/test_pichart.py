@@ -236,6 +236,14 @@ class JobsTests(unittest.TestCase):
         self.assertEqual([j["job"] for j in data["jobs"]], ["deploy", "sync", "backup", "pull"])
         self.assertEqual([j["group"] for j in data["jobs"]], ["problem", "daily", "daily", "frequent"])
 
+    def test_interval_beats_missing_next(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "deploy.json").write_text('{"job": "deploy", "ok": true, "started": 4900, "next": null, "interval_s": 300}')
+            (root / "prune.json").write_text('{"job": "prune", "ok": true, "started": 4900, "next": null, "interval_s": 604800}')
+            data = read_jobs(root, 5000)
+        self.assertEqual({j["job"]: j["group"] for j in data["jobs"]}, {"deploy": "frequent", "prune": "daily"})
+
     def test_missing_dir_is_empty(self):
         self.assertEqual(read_jobs(Path("/nonexistent/jobs"), 0)["jobs"], [])
 
