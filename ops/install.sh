@@ -109,7 +109,7 @@ cat > /usr/local/bin/joanpi-backup <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 case "\${1:-}" in
-  now) sudo systemctl start joanpi-backup.service; journalctl -u joanpi-backup -n 40 --no-pager -o cat ;;
+  now) start="\$(date +%s)"; sudo systemctl start joanpi-backup.service; journalctl -u joanpi-backup --since "@\$start" --no-pager -o cat ;;
   restore) shift; exec sudo -u "$BACKUP_USER" -H /usr/bin/python3 $lib/joanpi_backup.py restore "\$@" ;;
   login) exec sudo -u "$BACKUP_USER" -H env PROTON_DRIVE_CREDENTIALS_STORE=${store:-pass} ${bin:-proton-drive} auth login ;;
   *) echo "usage: joanpi-backup now | restore SOURCE [ARCHIVE] | login" >&2; exit 2 ;;
