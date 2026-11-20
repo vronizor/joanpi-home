@@ -21,6 +21,7 @@ class FakeDrive:
     def __init__(self, root: Path):
         self.root = root
         self.uploads = 0
+        self.strategies: list[str] = []
         self.trashed: list[str] = []
 
     def _local(self, remote: str) -> Path:
@@ -31,6 +32,7 @@ class FakeDrive:
 
     def upload(self, local: Path, remote_parent: str, strategy: str):
         self.uploads += 1
+        self.strategies.append(strategy)
         shutil.copytree(local, self._local(remote_parent) / local.name, dirs_exist_ok=True)
 
     def list_names(self, remote: str):
@@ -220,6 +222,10 @@ class MirrorTest(unittest.TestCase):
         uploads = self.drive.uploads
         self.assertEqual(self.run_once(), ["photos 1 new (4 files)"])
         self.assertEqual(self.drive.uploads, uploads + 1)
+        (self.photos / "1/b.jpg").write_bytes(b"full-size original")
+        self.assertEqual(self.run_once(), ["photos 1 new (4 files)"])
+        self.assertEqual((self.remote / "1/b.jpg").read_bytes(), b"full-size original")
+        self.assertEqual(self.drive.strategies[-1], "replace")
         self.assertEqual((self.photos / "1/a.jpg").read_bytes(), b"1/a.jpg")
         self.assertFalse(self.config.out_dir.exists())
 

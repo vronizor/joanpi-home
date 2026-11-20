@@ -483,7 +483,8 @@ def upload_mirror(config: Config, drive, name: str, entry: dict) -> str:
     done = load_snapshot(record)
     sent = 0
     for batch in entry["batches"]:
-        drive.upload(config.out_dir / name / batch["dir"] / nested[0], root, "skip")
+        # "replace": a batch only holds new or changed files, and a changed one must win
+        drive.upload(config.out_dir / name / batch["dir"] / nested[0], root, "replace")
         done.update({rel: (meta[0], meta[1]) for rel, meta in batch["files"].items()})
         save_snapshot(record, done)
         sent += len(batch["files"])
