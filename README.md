@@ -118,6 +118,7 @@ What it reads:
   - `dns`: AdGuard's own query and block counts (needs the credentials above).
 - Whether each service answers: a TCP connection to its local port, so the check itself never shows up as a request.
 - Docker disk use (images, volumes, build cache) and each container's log size, every 10 minutes.
+- Apps waiting for a tag: `joanpi-deploy` notes, for each app in `deploy.toml`, whether the default branch has commits past the newest `v*` tag (one extra ref in the `ls-remote` it already runs; it fetches only when the branch or the tag moved). Pi Chart reads that from `/var/lib/joanpi/deploy/state.json` and lists them under *Waiting for a tag*.
 - Scheduled jobs: the status files in `/var/lib/joanpi/jobs/` (see [Scheduled jobs](#scheduled-jobs)), read on each page refresh. The homepage shows a red line when one has failed or is over an hour late.
 
 Containers are matched to services by name or by compose project and service. A container that matches nothing still appears, under its own name; a service whose container isn't found shows as "Not found", which usually means `services.json` has the wrong name.

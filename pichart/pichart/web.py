@@ -4,7 +4,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .collector import Collector
-from .jobs import read_jobs
+from .jobs import read_jobs, read_untagged
 from .store import Store
 
 STATIC = Path(__file__).parent / "static"
@@ -25,6 +25,8 @@ def make_handler(collector: Collector, store: Store) -> type[BaseHTTPRequestHand
                 self._send_json(store.history(time.time()))
             elif path == "/api/jobs":
                 self._send_json(read_jobs(collector.config.jobs_dir, time.time()))
+            elif path == "/api/untagged":
+                self._send_json(read_untagged(collector.config.deploy_state, time.time()))
             elif path in FILES:
                 name, content_type = FILES[path]
                 self._send(200, content_type, (STATIC / name).read_bytes())

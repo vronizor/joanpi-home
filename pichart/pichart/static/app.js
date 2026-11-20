@@ -413,12 +413,48 @@ ${says}</summary>${log}</details>`;
   }).join("");
 }
 
+async function refreshUntagged() {
+  let data;
+  try {
+    data = await getJSON("api/untagged");
+  } catch {
+    return;
+  }
+  const box = el("untagged");
+  const n = data.apps.length;
+  el("untagged-title").innerHTML = `Waiting for a tag${n ? ` <span class="flag">[${n}]</span>` : ""}`;
+  if (!data.known) {
+    box.innerHTML = '<p class="empty" style="padding: 6px 8px; margin: 0">No deploy check has run yet (<code>joanpi-deploy</code>).</p>';
+    return;
+  }
+  if (!n) {
+    box.innerHTML = '<p class="empty" style="padding: 6px 8px; margin: 0">Nothing to tag: every app\'s main is its newest release.</p>';
+    return;
+  }
+  box.innerHTML = data.apps.map((a) => {
+    const count = a.commits == null ? "● New" : `● ${a.commits} new`;
+    const since = a.tag ? `on main since ${esc(a.tag)}` : "no v* tag yet";
+    const last = a.last_commit ? ` · last commit ${ago(data.time - a.last_commit)}` : "";
+    const subject = a.subject ? `<span class="meta">“${esc(a.subject)}”</span>` : "";
+    const base = a.github ? `https://github.com/${a.github}` : null;
+    const links = base
+      ? `<span class="meta"><a href="${a.tag ? `${base}/compare/${encodeURIComponent(a.tag)}...${a.head}` : `${base}/commits/${a.head}`}">See the commits</a> · <a href="${base}/releases/new">Tag a release</a></span>`
+      : "";
+    return `<div class="untagged"><span class="state warn">${count}</span>
+<span class="title">${esc(a.app)}</span>
+<span class="meta">${since}${last}</span>
+${subject}${links}</div>`;
+  }).join("");
+}
+
 refreshNow().then(refreshHistory).then(refreshJobs);
+refreshUntagged();
 setInterval(() => document.visibilityState === "visible" && refreshNow(), NOW_EVERY);
 setInterval(() => {
   if (document.visibilityState === "visible") {
     refreshHistory();
     refreshJobs();
+    refreshUntagged();
   }
 }, HISTORY_EVERY);
 document.addEventListener("visibilitychange", () => {
@@ -426,5 +462,6 @@ document.addEventListener("visibilitychange", () => {
     refreshNow();
     refreshHistory();
     refreshJobs();
+    refreshUntagged();
   }
 });

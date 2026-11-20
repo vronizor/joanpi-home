@@ -101,6 +101,13 @@ figcaption span { font-weight: normal; font-size: 15px; color: #444444; }
 .job .title { font-weight: bold; font-size: 16px; overflow-wrap: anywhere; }
 .job .meta { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; overflow-wrap: anywhere; }
 .job .meta .says { color: #000000; }
+.untagged { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 2px 10px; padding: 6px 8px; border-top: 1px solid #c0c0c0; }
+.untagged:first-child { border-top: 0; }
+.untagged:nth-child(odd) { background: #f2f2f2; }
+.untagged > :not(.state) { grid-column: 2; }
+.untagged .state { grid-row: 1 / span 3; font-family: Arial, Helvetica, sans-serif; font-size: 13px; font-weight: bold; }
+.untagged .title { font-weight: bold; font-size: 16px; }
+.untagged .meta { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; overflow-wrap: anywhere; }
 .job pre { margin: 0 8px 8px; padding: 6px 8px; max-height: 260px; overflow: auto; background: #ffffe1; border: 1px solid #c0c0c0; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 h2 .flag { margin-left: 8px; font-size: 13px; }
 footer { margin-top: 12px; padding-top: 14px; border-top: 1px solid #c0c0c0; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #444444; }
@@ -169,6 +176,10 @@ footer { margin-top: 12px; padding-top: 14px; border-top: 1px solid #c0c0c0; dis
 <h2 id="jobs-title">Scheduled jobs</h2>
 <div class="jobs" id="jobs"><p class="empty">Loading…</p></div>
 <p class="note">Timers on the Pi itself (systemd), newest result of each: problems first, then the daily and weekly jobs, then the ones that run every few minutes, each group in alphabetical order so rows stay put. Tap a job for the end of its last run's output; the full log is <code>journalctl -u &lt;job&gt;</code>. A job is overdue when its next run is more than an hour late. Jobs that apps run themselves (Telex pulls, Kiosk digests, Double Feature refreshes) show on their own pages.</p>
+
+<h2 id="untagged-title">Waiting for a tag</h2>
+<div class="jobs" id="untagged"><p class="empty" style="padding: 6px 8px; margin: 0">Loading…</p></div>
+<p class="note">Apps deployed from release tags whose main has commits that no <code>v*</code> tag covers yet, so they aren't live on the Pi. <code>joanpi-deploy</code> checks every 5 minutes; a row goes away once the tag is pushed. Tag from GitHub (Releases → Draft a new release) or with <code>git tag v1.2.3 &amp;&amp; git push origin v1.2.3</code>.</p>
 
 <h2>Last 48 hours</h2>
 <div class="legend">

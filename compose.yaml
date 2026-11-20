@@ -29,4 +29,5 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/host/docker-containers:ro
       - /var/lib/joanpi/jobs:/host/jobs:ro
+      - /var/lib/joanpi/deploy:/host/deploy:ro
     restart: unless-stopped

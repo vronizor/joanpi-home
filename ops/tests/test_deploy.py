@@ -94,6 +94,41 @@ class DeployTest(unittest.TestCase):
         self.assertEqual(self.state["last"]["result"], "ok")
         self.assertFalse(jd.needs_attention(self.state))
 
+    def test_untagged_commits_on_main_are_counted_until_tagged(self):
+        repo = self.repo()
+        self.check(repo)
+        self.assertEqual(jd.untagged_count(self.state), 0)
+        self.commit("2")
+        self.commit("3")
+        self.check(repo)
+        self.assertEqual(jd.untagged_count(self.state), 2)
+        self.assertEqual(self.state["untagged"]["tag"], "v1.0")
+        self.assertEqual(self.state["untagged"]["subject"], "3")
+        self.assertIn("2 commits since v1.0", jd.untagged_text(self.state))
+        git(self.src, "tag", "-a", "v1.1", "-m", "release")
+        self.check(repo)
+        self.assertEqual(jd.untagged_count(self.state), 0)
+        self.assertNotIn("untagged", self.state)
+
+    def test_repo_with_no_tag_counts_every_commit(self):
+        git(self.src, "tag", "-d", "v1.0")
+        self.commit("2")
+        repo = self.repo()
+        self.check(repo)
+        self.assertEqual(jd.untagged_count(self.state), 2)
+        self.assertIn("no v* tag yet", jd.untagged_text(self.state))
+
+    def test_github_name_from_remote(self):
+        repo = self.repo()
+        for url, want in [
+            ("https://github.com/vronizor/telex", "vronizor/telex"),
+            ("https://github.com/vronizor/telex.git", "vronizor/telex"),
+            ("git@github.com:vronizor/lux-archive.git", "vronizor/lux-archive"),
+            ("git@github-econ:vronizor/regularity-conditions.git", "vronizor/regularity-conditions"),
+        ]:
+            git(repo.dir, "remote", "set-url", "origin", url)
+            self.assertEqual(repo.github(), want)
+
     def test_failed_release_rolls_back_and_is_not_retried(self):
         repo = self.repo(broken={"2"})
         self.check(repo)

@@ -35,6 +35,7 @@ class Config:
     adguard_password: str
     services: list[ServiceRule]
     jobs_dir: Path = Path("/host/jobs")
+    deploy_state: Path = Path("/host/deploy/state.json")
 
 
 def load_services(path: Path) -> list[ServiceRule]:
@@ -65,4 +66,5 @@ def load() -> Config:
         adguard_password=env.get("ADGUARD_PASSWORD", ""),
         services=load_services(Path(env.get("PICHART_SERVICES", "/app/services.json"))),
         jobs_dir=Path(env.get("PICHART_JOBS", "/host/jobs")),
+        deploy_state=Path(env.get("PICHART_DEPLOY_STATE", "/host/deploy/state.json")),
     )

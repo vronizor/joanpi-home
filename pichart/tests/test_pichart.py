@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pichart import system
 from pichart.config import ServiceRule
-from pichart.jobs import read_jobs
+from pichart.jobs import read_jobs, read_untagged
 from pichart.docker import count_requests, demux, docker_df_sizes, exit_reason, last_error_line, parse_timestamp
 from pichart.store import BUCKET, BUCKETS, Store
 
@@ -210,6 +210,25 @@ class StoreTests(unittest.TestCase):
             store.set_log_cursor("telex", 12.5)
             store.set_log_cursor("telex", 13.5)
             self.assertEqual(store.log_cursor("telex"), 13.5)
+
+
+class UntaggedTests(unittest.TestCase):
+    def test_lists_apps_with_commits_past_their_tag(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            self.assertFalse(read_untagged(path, 0)["known"])
+            path.write_text(json.dumps({
+                "telex": {"ref": "v1.2"},
+                "velo": {"untagged": {"head": "abc", "tag": "v0.9", "commits": 3, "github": "vronizor/velotheque"}},
+                "lux": {"untagged": {"head": "def", "tag": "v2", "commits": 0}},
+                "econ": {"untagged": {"head": "123", "tag": None}},
+            }))
+            data = read_untagged(path, 0)
+            self.assertTrue(data["known"])
+            self.assertEqual([a["app"] for a in data["apps"]], ["econ", "velo"])
+            self.assertEqual(data["apps"][1]["commits"], 3)
+            self.assertIsNone(data["apps"][0]["commits"])
 
 
 class JobsTests(unittest.TestCase):

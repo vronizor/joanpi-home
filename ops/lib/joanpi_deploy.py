@@ -79,9 +79,33 @@ class Repo:
     def git(self, *args: str, timeout: int = 120) -> str:
         return run(["git", *args], self.dir, timeout)
 
+    def remote_refs(self) -> tuple[dict[str, str], str | None]:
+        """The v* tags on GitHub with the commit each points at, and the default branch's commit."""
+        out = self.git("ls-remote", "origin", "HEAD", "v*", timeout=60)
+        tags: dict[str, str] = {}
+        head = None
+        for line in out.splitlines():
+            sha, _, ref = line.partition("\t")
+            if ref == "HEAD":
+                head = sha
+            elif ref.startswith("refs/tags/"):
+                name = ref.removeprefix("refs/tags/")
+                if name.endswith("^{}"):
+                    tags[name[:-3]] = sha
+                else:
+                    tags.setdefault(name, sha)
+        return tags, head
+
     def remote_tags(self) -> list[str]:
-        out = self.git("ls-remote", "--tags", "--refs", "origin", "v*", timeout=60)
-        return [line.split("refs/tags/", 1)[1] for line in out.splitlines() if "refs/tags/" in line]
+        return list(self.remote_refs()[0])
+
+    def github(self) -> str | None:
+        try:
+            url = self.git("remote", "get-url", "origin").strip()
+        except DeployError:
+            return None
+        m = re.search(r"github[^/:]*[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$", url)
+        return m.group(1) if m else None
 
     def fetch(self) -> None:
         self.git("fetch", "--quiet", "--tags", "--force", "--prune", "origin", timeout=300)
@@ -209,10 +233,51 @@ def deploy(repo: Repo, st: dict, ref: str, force: bool, log) -> str:
     return finish("ok", f"deployed (was {previous})")
 
 
+def note_untagged(repo: Repo, st: dict, tags: dict[str, str], head: str | None) -> None:
+    """Remember whether the default branch has commits no release tag covers yet.
+
+    Fetches only when the branch or the newest tag moved since the last look.
+    """
+    newest = newest_tag(tags)
+    if head is None or (newest and tags[newest] == head):
+        st.pop("untagged", None)
+        return
+    known = st.get("untagged") or {}
+    if known.get("head") == head and known.get("tag") == newest and "commits" in known:
+        return
+    info: dict = {"head": head, "tag": newest, "github": repo.github()}
+    try:
+        repo.git("fetch", "--quiet", "--tags", "--force", "origin", timeout=300)
+        span = f"{tags[newest]}..{head}" if newest else head
+        info["commits"] = int(repo.git("rev-list", "--count", span).strip())
+        stamp, _, subject = repo.git("log", "-1", "--format=%ct %s", head).strip().partition(" ")
+        info.update(last_commit=int(stamp), subject=subject)
+    except (DeployError, ValueError):
+        pass
+    st["untagged"] = info
+
+
+def untagged_text(st: dict) -> str:
+    info = st.get("untagged") or {}
+    n = info.get("commits")
+    what = "commits" if n is None else f"{n} commit{'s' if n != 1 else ''}"
+    since = f"since {info['tag']}" if info.get("tag") else "and no v* tag yet"
+    return f"main has {what} {since}: tag it to deploy"
+
+
+def untagged_count(st: dict) -> int | None:
+    """Commits on the default branch past the newest tag: 0 when none, None when unknown."""
+    info = st.get("untagged")
+    if not info:
+        return 0
+    return info.get("commits")
+
+
 def check(repo: Repo, st: dict, log) -> None:
-    tags = repo.remote_tags()
+    tags, head = repo.remote_refs()
     st["check_fails"] = 0
     newest = newest_tag(tags)
+    note_untagged(repo, st, tags, head)
     if "ref" not in st:
         st.update(ref=repo.describe_head(), sha=repo.head(), at=now(), seen=newest)
         log(f"{repo.name}: first check, running {st['ref']}; tags after {newest or 'none'} will deploy")
@@ -270,6 +335,8 @@ def print_status(repos: dict[str, Repo], state: dict) -> None:
         print(f"{name:10} running {st.get('ref', '?'):16} since {fmt_time(st.get('at'))}   newest tag {st.get('seen') or '-'}{flag}")
         if last:
             print(f"{'':10} last: {last['ref']} {last['result']} {fmt_time(last.get('at'))}  {last.get('message', '')}")
+        if untagged_count(st) != 0:
+            print(f"{'':10} {untagged_text(st)}")
 
 
 def main(argv: list[str]) -> int:
@@ -338,7 +405,11 @@ def main(argv: list[str]) -> int:
             quiet += 1
         save_state(STATE_DIR, state)
 
+    waiting = [f"{n} ({c})" if (c := untagged_count(state.get(n, {}))) else n
+               for n in repos if untagged_count(state.get(n, {})) != 0]
     parts = ([f"{quiet} up to date"] if quiet else []) + events
+    if waiting:
+        parts.append("untagged on main: " + ", ".join(waiting))
     print("summary: " + " · ".join(parts or ["nothing to check"]))
     return 1 if any(needs_attention(state.get(n, {})) for n in repos) else 0
 

@@ -39,3 +39,26 @@ def read_jobs(directory: Path, now: float) -> dict:
     jobs.sort(key=lambda j: (GROUPS[j["group"]], j["state"] != "failed", (j.get("description") or j.get("job", "")).lower()))
     problems = sum(1 for j in jobs if j["state"] != "ok")
     return {"time": now, "problems": problems, "jobs": jobs}
+
+
+def read_untagged(state_path: Path, now: float) -> dict:
+    """Apps whose default branch has commits past their newest v* tag, from joanpi-deploy's state."""
+    try:
+        state = json.loads(state_path.read_text())
+    except (OSError, ValueError):
+        return {"time": now, "known": False, "apps": []}
+    apps = []
+    for name, st in sorted(state.items()):
+        info = st.get("untagged") if isinstance(st, dict) else None
+        if not info or info.get("commits") == 0:
+            continue
+        apps.append({
+            "app": name,
+            "tag": info.get("tag"),
+            "commits": info.get("commits"),
+            "last_commit": info.get("last_commit"),
+            "subject": info.get("subject"),
+            "github": info.get("github"),
+            "head": info.get("head"),
+        })
+    return {"time": now, "known": True, "apps": apps}
