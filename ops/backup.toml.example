@@ -1,8 +1,13 @@
 # /etc/joanpi/backup.toml — what joanpi-backup sends to Proton Drive.
-# The Proton CLI, its version pin and its session are Vélothèque's (/etc/velotheque/backup.env).
+# The Proton CLI, its version pin and the backup user are in /etc/joanpi/proton.env.
 # Paths may start with ~/ (OWNER_HOME) and use globs. A path that matches nothing fails the run.
 # SQLite databases are snapshotted with SQLite's backup API, never copied while live.
 # Always skipped: *.log, *-wal, *-shm, *-journal, *.tmp, *.part
+#
+# kind = "files" (default): the paths, one dated .tar.gz per run, skipped when unchanged.
+# kind = "postgres": pg_dump of a Compose service (compose_dir, service), one .tar.gz per run.
+# kind = "mirror": one folder copied file by file; only new or changed files go up, and
+#   nothing is deleted on the Drive. For large folders that only grow, like photos.
 
 remote = "/my-files/Backups/joanpi"
 keep_daily = 14
@@ -27,5 +32,5 @@ paths = [
   "~/docker/*/docker-compose.yml",
   "~/docker/adguard/conf",
   "/etc/joanpi",
-  "/etc/velotheque/backup.env",
 ]
+

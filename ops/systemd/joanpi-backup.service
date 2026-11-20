@@ -1,5 +1,5 @@
 [Unit]
-Description=App data backup to Proton Drive (Baby Buddy, Kiosk, Double Feature, config)
+Description=App data backup to Proton Drive (Vélothèque, Baby Buddy, Kiosk, Double Feature, config)
 Wants=network-online.target
 After=network-online.target docker.service
 
@@ -7,7 +7,8 @@ After=network-online.target docker.service
 Type=oneshot
 User=@BACKUP_USER@
 Group=@BACKUP_USER@
-# "+": the stage step reads app data as root; the upload runs as the user holding the Proton session.
+# "+": the stage step reads app data and runs pg_dump through Docker as root; the upload runs
+# as the user holding the Proton session, which lives in its home folder.
 ExecStartPre=+/usr/bin/python3 /usr/local/lib/joanpi/joanpi_backup.py stage
 ExecStart=/usr/bin/python3 /usr/local/lib/joanpi/joanpi_backup.py upload
 ExecStopPost=+/usr/bin/python3 /usr/local/lib/joanpi/job_status.py joanpi-backup
@@ -18,5 +19,5 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=@VELO_STATE@ /var/lib/joanpi-backup
+ReadWritePaths=@BACKUP_HOME@ /var/lib/joanpi-backup
 UMask=0077

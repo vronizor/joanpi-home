@@ -1,0 +1,15 @@
+
+# Vélothèque (added by ops/install.sh when ~/velotheque exists)
+[[source]]
+name = "velotheque-db"
+kind = "postgres"
+compose_dir = "@VELOTHEQUE_DIR@"
+service = "db"
+# GADM regions and the tags derived from them come back with `velotheque regions reload`
+exclude_table_data = ["region", "region_part", "activity_region", "route_region"]
+
+[[source]]
+name = "velotheque-photos"
+kind = "mirror"
+paths = ["@PHOTOS_DIR@"]
+exclude = ["thumbs/*", "*/thumbs/*", ".*"]

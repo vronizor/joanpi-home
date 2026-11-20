@@ -125,10 +125,13 @@ nmcli con show "YOUR_CONNECTION_NAME"</pre></div>
 <div class="cmd"><pre>sudo apt update &amp;&amp; sudo apt upgrade -y
 sudo reboot</pre></div>
 <h3>Scheduled jobs (status also on <a href="/chart/#jobs-title">Pi Chart</a>)</h3>
-<div class="cmd"><pre>systemctl list-timers 'joanpi-*' 'velotheque-*'
+<div class="cmd"><pre>systemctl list-timers 'joanpi-*'
 journalctl -u joanpi-backup -n 50
 sudo systemctl start joanpi-velo-sync
-joanpi-backup restore kiosk</pre></div>
+joanpi-backup now
+joanpi-backup restore kiosk
+joanpi-backup login</pre></div>
+<p class="note"><code>joanpi-backup login</code> when the night's backup failed because the Proton session expired, then <code>joanpi-backup now</code>.</p>
 <h3>Update the jobs after a pull</h3>
 <div class="cmd"><pre>cd ~/joanpi-home &amp;&amp; git pull &amp;&amp; sudo ops/install.sh</pre></div>
 <h3>Shut down / reboot</h3>

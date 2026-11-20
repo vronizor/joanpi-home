@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -13,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 
 import job_status
 import joanpi_backup as jb
+import proton_drive
 
 
 class FakeDrive:
@@ -42,10 +44,12 @@ class FakeDrive:
             self.trashed.append(p)
             self._local(p).unlink()
 
-    def run(self, *args):
-        remote, local = args[-2], Path(args[-1])
-        shutil.copy2(self._local(remote), local / Path(remote).name)
-        return ""
+    def download(self, remote: str, local: Path):
+        src = self._local(remote)
+        if src.is_dir():
+            shutil.copytree(src, local / src.name, dirs_exist_ok=True)
+        else:
+            shutil.copy2(src, local / src.name)
 
 
 def make_db(path: Path, rows: int, wal: bool = False) -> sqlite3.Connection:
@@ -164,12 +168,154 @@ class BackupTest(unittest.TestCase):
         example = Path(__file__).resolve().parents[1] / "backup.toml.example"
         ops_env = self.tmp / "ops.env"
         ops_env.write_text("OWNER=you\nOWNER_HOME=/home/you\n")
-        velo = self.tmp / "backup.env"
-        velo.write_text("BACKUP_USER=velobackup\nPROTON_DRIVE_VERSION=0.9.0\n")
-        config = jb.Config.load(example, ops_env, velo)
+        proton = self.tmp / "proton.env"
+        proton.write_text("BACKUP_USER=velobackup\nPROTON_DRIVE_VERSION=0.9.0\n")
+        config = jb.Config.load(example, ops_env, proton)
         self.assertEqual([s.name for s in config.sources], ["babybuddy", "kiosk", "double-feature", "config"])
+        velo = (example.parent / "backup-velotheque.toml.example").read_text()
+        combined = self.tmp / "backup.toml"
+        combined.write_text(example.read_text() + velo.replace("@VELOTHEQUE_DIR@", "/home/you/velotheque").replace("@PHOTOS_DIR@", "/srv/velotheque/photos"))
+        kinds = [(s.name, s.kind) for s in jb.Config.load(combined, ops_env, proton).sources][-2:]
+        self.assertEqual(kinds, [("velotheque-db", "postgres"), ("velotheque-photos", "mirror")])
+        self.assertEqual(config.backup_user, "velobackup")
         self.assertEqual(config.proton_version, "0.9.0")
         self.assertEqual(jb.split_remote(config.remote), ("/my-files", ["Backups", "joanpi"]))
+
+
+class MirrorTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.photos = self.tmp / "srv" / "photos"
+        for rel in ("1/a.jpg", "1/b.jpg", "2/c.jpg", "1/thumbs/a.jpg", ".hidden", "2/d.jpg.part"):
+            (self.photos / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.photos / rel).write_bytes(rel.encode())
+        self.config = jb.Config(
+            remote="/my-files/Backups/joanpi",
+            sources=[jb.Source.from_toml({
+                "name": "photos", "kind": "mirror", "paths": [str(self.photos)],
+                "exclude": ["thumbs/*", "*/thumbs/*", ".*"],
+            })],
+            state_dir=self.tmp / "state",
+            owner_home=self.tmp,
+        )
+        self.drive = FakeDrive(self.tmp / "drive")
+        self.remote = self.drive.root / "my-files/Backups/joanpi/photos"
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def run_once(self, now=datetime(2026, 11, 21, 4, 15, tzinfo=UTC)):
+        jb.stage(self.config, now, owner=(os.getuid(), os.getgid()))
+        return jb.upload(self.config, self.drive, now)
+
+    def remote_files(self):
+        return sorted(p.relative_to(self.remote).as_posix() for p in self.remote.rglob("*") if p.is_file())
+
+    def test_only_new_or_changed_files_go_up_and_originals_stay(self):
+        self.assertEqual(self.run_once(), ["photos 3 new (3 files)"])
+        self.assertEqual(self.remote_files(), ["1/a.jpg", "1/b.jpg", "2/c.jpg"])
+        self.assertEqual(self.run_once(), ["photos unchanged (3 files)"])
+        (self.photos / "3").mkdir()
+        (self.photos / "3/e.jpg").write_bytes(b"e")
+        uploads = self.drive.uploads
+        self.assertEqual(self.run_once(), ["photos 1 new (4 files)"])
+        self.assertEqual(self.drive.uploads, uploads + 1)
+        self.assertEqual((self.photos / "1/a.jpg").read_bytes(), b"1/a.jpg")
+        self.assertFalse(self.config.out_dir.exists())
+
+    def test_batches_resume_after_a_failed_upload(self):
+        for i in range(jb.MIRROR_BATCH + 5):
+            (self.photos / "many" / f"{i:04d}.jpg").parent.mkdir(exist_ok=True)
+            (self.photos / "many" / f"{i:04d}.jpg").write_bytes(b"x")
+        real = self.drive.upload
+        calls = []
+
+        def flaky(local, remote_parent, strategy):
+            calls.append(local)
+            if len(calls) == 2:
+                raise RuntimeError("network")
+            real(local, remote_parent, strategy)
+
+        self.drive.upload = flaky
+        with self.assertRaises(RuntimeError):
+            self.run_once()
+        self.drive.upload = real
+        line = self.run_once()[0]
+        self.assertEqual(line, f"photos 8 new ({jb.MIRROR_BATCH + 8} files)")
+
+    def test_restore_downloads_the_folder(self):
+        self.run_once()
+        restored = jb.restore(self.config, self.drive, "photos")
+        self.assertEqual(sorted(p.name for p in restored.rglob("*") if p.is_file()), ["a.jpg", "b.jpg", "c.jpg"])
+
+    def test_mirror_needs_one_folder(self):
+        with self.assertRaises(jb.BackupError):
+            jb.Source.from_toml({"name": "x", "kind": "mirror", "paths": ["/a", "/b"]})
+        with self.assertRaises(jb.BackupError):
+            jb.Source.from_toml({"name": "x", "kind": "postgres"})
+
+
+class PostgresTest(unittest.TestCase):
+    def test_dump_is_checked_and_archived(self):
+        tmp = Path(tempfile.mkdtemp())
+        calls = []
+
+        def fake_compose(source, home, *args, stdin=None, stdout=None):
+            calls.append(args)
+            if "pg_dump" in args:
+                stdout.write(b"PGDMP fake")
+            elif stdin is not None:
+                self.assertEqual(stdin.read(), b"PGDMP fake")
+
+        config = jb.Config(
+            remote="/my-files/Backups/joanpi",
+            sources=[jb.Source.from_toml({
+                "name": "velo-db", "kind": "postgres", "compose_dir": "~/velo",
+                "exclude_table_data": ["region"],
+            })],
+            state_dir=tmp / "state",
+            owner_home=tmp,
+        )
+        original = jb.compose
+        jb.compose = fake_compose
+        try:
+            manifest = jb.stage(config, datetime(2026, 11, 21, 4, 15, tzinfo=UTC))
+        finally:
+            jb.compose = original
+        self.assertIn("--exclude-table-data=region", calls[0])
+        self.assertEqual(calls[1][-2:], ("pg_restore", "--list"))
+        entry = manifest["sources"]["velo-db"]
+        with tarfile.open(config.out_dir / entry["archive"]) as tar:
+            self.assertEqual(tar.getnames(), ["velo-db.dump"])
+        shutil.rmtree(tmp)
+
+
+class ListingTest(unittest.TestCase):
+    def test_listing_shapes(self):
+        for output in (
+            '[{"name": "a.dump", "type": "file"}, {"name": "b.dump"}]',
+            '{"items": [{"name": "a.dump"}, {"name": "b.dump"}]}',
+            '{"name": "a.dump"}\n{"name": "b.dump"}\n',
+            '["a.dump", "b.dump"]',
+        ):
+            self.assertEqual(proton_drive.parse_listing(output), ["a.dump", "b.dump"])
+
+    def test_proton_drive_0_9_shape(self):
+        node = {"uid": "u1", "name": {"ok": True, "value": "a.dump"}, "type": "file"}
+        broken = {**node, "uid": "u2", "name": {"ok": False, "error": "decryption failed"}}
+        other = {**node, "uid": "u3", "name": {"ok": True, "value": "b.dump"}}
+        self.assertEqual(proton_drive.parse_listing(json.dumps([node, broken, other])), ["a.dump", "b.dump"])
+
+    def test_session_files_are_locked_down(self):
+        tmp = Path(tempfile.mkdtemp())
+        session = tmp / ".local" / "share" / "proton-drive-cli" / "auth-session.json"
+        session.parent.mkdir(parents=True)
+        session.write_text("{}")
+        session.chmod(0o644)
+        proton_drive.protect_session_files(tmp)
+        self.assertEqual(oct(session.stat().st_mode & 0o777), "0o600")
+        self.assertEqual(oct(session.parent.stat().st_mode & 0o777), "0o700")
+        shutil.rmtree(tmp)
 
 
 class JobStatusTest(unittest.TestCase):

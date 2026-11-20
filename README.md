@@ -138,8 +138,7 @@ Everything the Pi does on a clock runs as a systemd timer, defined in `ops/`. Ti
 | `joanpi-deploy` | every 5 min | deploys new `v*` release tags of the apps in `/etc/joanpi/deploy.toml`, with a check and a rollback (`ops/lib/joanpi_deploy.py`, see [Deploys](site/docs/deploy.html)) |
 | `joanpi-velo-sync` | ~02:40 | Vélothèque's Strava sync (the "Sync now" job; a rate limit just resumes next night) |
 | `joanpi-lux-backup` | 03:10 | Lux Archive's `scripts/backup.sh` (commits and pushes to its data repo) |
-| `velotheque-backup` | ~03:30 | Vélothèque's own Proton backup (its repo's `ops/`); only the status hook is added here |
-| `joanpi-backup` | ~04:15 | Proton Drive backup of the sources in `/etc/joanpi/backup.toml` |
+| `joanpi-backup` | ~04:15 | Proton Drive backup of every app's data: the sources in `/etc/joanpi/backup.toml`, Vélothèque's database and photos included |
 | `joanpi-docker-prune` | Sun 05:00 | dangling images; build cache trimmed to the 2 GB most recently used |
 
 Apps that schedule their own work (Telex pulls, Kiosk digests, Double Feature refreshes) keep showing it on their own pages.
@@ -151,28 +150,65 @@ cd ~/joanpi-home && git pull && sudo ops/install.sh
 docker compose up -d --build pichart     # Jobs panel (mounts /var/lib/joanpi/jobs)
 ```
 
-The first run creates `/etc/joanpi/ops.env` (owner, home folder, Vélothèque path) and `/etc/joanpi/backup.toml`, enables the timers and prints them. If the old crontab lines for Tally or Lux are still there, it prints the command that removes them.
+The first run creates `/etc/joanpi/ops.env` (owner, home folder, Vélothèque path), `/etc/joanpi/proton.env` and `/etc/joanpi/backup.toml` (with Vélothèque's database and photos when its checkout is there), enables the timers and prints them. If the old crontab lines for Tally or Lux are still there, it prints the command that removes them.
 
 Run a job now: `sudo systemctl start joanpi-velo-sync`. Its log: `journalctl -u joanpi-velo-sync -n 50`.
 
 ### App data backup (`joanpi-backup`)
 
-It uses Vélothèque's Proton setup (`/etc/velotheque/backup.env`: the pinned `proton-drive` CLI, the backup user and its session), so there is one Proton login on the Pi. The two backups never overlap: this one waits for Vélothèque's to finish.
+> **A backup isn't trusted until a restore has been tested.** Run the restore tests below after setup, and again from time to time.
 
-1. **Stage** (root): each source in `backup.toml` becomes one `.tar.gz`. SQLite databases are copied with SQLite's backup API and checked with `PRAGMA integrity_check`, never copied as live files. `*.log`, `-wal`/`-shm`/`-journal` files are skipped. A path that matches nothing fails the run, so a moved folder can't silently back up nothing.
-2. **Upload** (the backup user): a source whose content hasn't changed since its last upload, and whose archive is still on the Drive, is skipped. Others go to `Backups/joanpi/<source>/<source>-<UTC date>T<time>Z.tar.gz`. Retention per source: the newest archive of each of the last 14 days and 8 ISO weeks; older ones go to the Proton Drive trash.
+One nightly job (about 04:15) for every app, with one Proton login on the Pi. Sources are listed in `/etc/joanpi/backup.toml`, in three kinds:
+
+| Kind | For | What a run does |
+|---|---|---|
+| `files` (default) | small app folders, config | the paths become one dated `.tar.gz`; skipped when nothing changed and the last archive is still on the Drive |
+| `postgres` | Vélothèque's database | `pg_dump --format=custom` in the Compose service, checked with `pg_restore --list`, then one dated `.tar.gz`. Tables listed in `exclude_table_data` keep their schema but not their rows (Vélothèque's GADM regions: they download again and would almost double the dump) |
+| `mirror` | Vélothèque's photos | the folder copied file by file to `Backups/joanpi/<source>/`, only files new or changed since the last run, in batches of 200. Nothing is ever deleted on the Drive. An interrupted first upload resumes where it stopped |
+
+1. **Stage** (root, the only step that can read every app's data and reach Docker): SQLite databases are copied with SQLite's backup API and checked with `PRAGMA integrity_check`, never copied as live files. `*.log`, `-wal`/`-shm`/`-journal`, `*.tmp`, `*.part` are skipped. A path that matches nothing fails the run, so a moved folder can't silently back up nothing. Mirror files are hard-linked into upload batches (copied if they're on another disk), never moved or changed.
+2. **Upload** (the backup user, the only account holding the Proton session): archives go to `Backups/joanpi/<source>/<source>-<UTC date>T<time>Z.tar.gz`. Retention per archived source: the newest archive of each of the last 14 days and 8 ISO weeks; older ones go to the Proton Drive trash (`filesystem delete` only works on trashed items, so Proton or you empty the trash).
 
 Deploy keys are left out on purpose: they're quicker to regenerate than to protect.
 
-**Restore test** (do it once after setup, then now and then):
+`joanpi-backup now` runs the whole backup and prints its log. `ops/lib/proton_drive.py` is the only code that knows the `proton-drive` CLI.
+
+**Restore tests:**
 
 ```sh
-joanpi-backup restore kiosk          # newest archive; or: joanpi-backup restore kiosk kiosk-2026-11-05T0415Z.tar.gz
+joanpi-backup restore kiosk                # newest archive; or name one: kiosk-2026-11-05T0415Z.tar.gz
+joanpi-backup restore velotheque-db        # prints the path of the .dump it unpacked
+cd ~/velotheque && sudo scripts/restore-db.sh /var/lib/joanpi-backup/restore/velotheque-db/<archive>/velotheque-db.dump
+#   → "RESTORE TEST OK: row counts match the live database", then: sudo scripts/restore-db.sh --drop-scratch
+joanpi-backup restore velotheque-photos    # downloads the whole folder; slow, do it now and then
 ```
 
-It downloads the archive, unpacks it under `/var/lib/joanpi-backup/restore/<source>/` (paths mirror the Pi's, from `/`) and runs SQLite's integrity check on every database. It never touches live data. To put a source back: `docker compose stop` the app, `sudo cp -a` the unpacked folder over its data folder, start it again.
+Archives unpack under `/var/lib/joanpi-backup/restore/<source>/` (file paths mirror the Pi's, from `/`), with SQLite's integrity check on every database. Nothing live is touched.
 
-`joanpi-backup now` runs the whole backup and prints its log.
+- **Put a source back:** `docker compose stop` the app, `sudo cp -a` the unpacked folder over its data folder, start it again.
+- **Vélothèque's database:** `sudo scripts/restore-db.sh --live <dump>` in its checkout (stops the app, asks you to type the database name), then `docker compose exec app velotheque regions reload`.
+- **Vélothèque's photos:** `sudo rsync -a /var/lib/joanpi-backup/restore/velotheque-photos/ "$VELOTHEQUE_DATA_DIR/photos/"`, then `docker compose exec app velotheque normalize` rebuilds thumbnails and photo rows.
+
+**Proton setup** (`/etc/joanpi/proton.env`): the backup user, and the pinned CLI version. The CLI is pre-1.0, so the backup refuses to run unless `proton-drive --version` matches `PROTON_DRIVE_VERSION`; check a new release by hand, then change the pin. On the Pi this is still the user `velobackup` from when Vélothèque had its own backup: its home (`/var/lib/velotheque-backup`) holds the session, and renaming it would mean logging in again.
+
+Setup from scratch (once):
+
+```sh
+# 1. The CLI: the linux/arm64 build from https://proton.me/drive/download, SHA-512 checked
+sudo install -m 0755 proton-drive /usr/local/bin/proton-drive
+# 2. proton.env, the backup user and the timers
+sudo apt install pass && sudo ops/install.sh
+# 3. A GPG key and password store for the backup user (no passphrase: the job runs unattended,
+#    so file permissions protect it; its home is 700). USER is BACKUP_USER from proton.env
+sudo -u USER -H gpg --batch --pinentry-mode loopback --passphrase '' --quick-gen-key joanpi-backup default default never
+sudo -u USER -H pass init joanpi-backup
+# 4. Log in: open the printed URL on the laptop and finish there
+joanpi-backup login
+```
+
+**When the Proton session expires**, the night's run fails and Pi Chart shows it: `joanpi-backup login`, then `joanpi-backup now`. If `pass` is too fiddly, set `PROTON_DRIVE_CREDENTIALS_STORE=unsafe_file` in `proton.env`, re-run `sudo ops/install.sh` and log in again: the session is then a plain JSON file in the backup user's home, kept `chmod 600` in a `700` folder.
+
+What was checked live about `proton-drive` 0.9.0 (all undocumented): `filesystem list --json` returns nodes whose `name` is `{"ok": true, "value": "…"}`; errors exit 1 with a message on stderr; uploading a folder with `--folder-conflict-strategy merge` creates missing remote folders in one call; unchanged files are skipped on re-upload; per-command `--help` doesn't work.
 
 ### Docker log size (optional, once)
 

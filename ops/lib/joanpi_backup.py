@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
-"""Back up the Pi's small, irreplaceable app data to Proton Drive.
+"""Back up the Pi's app data to Proton Drive.
 
 Two steps, as two users (see ops/systemd/joanpi-backup.service):
-  stage   (root)         snapshot each source into a .tar.gz; SQLite files through the backup API
-  upload  (backup user)  upload changed archives to <remote>/<source>/, then apply retention
-and, by hand, `restore SOURCE [ARCHIVE]` downloads an archive, unpacks it and checks it.
+  stage   (root)         snapshot each source; SQLite files through the backup API, Postgres
+                         through pg_dump, mirrored folders as hard links to their new files
+  upload  (backup user)  upload changed archives to <remote>/<source>/ and apply retention;
+                         upload a mirrored folder's new files in batches
+and, by hand, `restore SOURCE [ARCHIVE]` downloads a source, unpacks it and checks it.
 
-The Proton CLI wrapper (Drive) is imported from Vélothèque's backup, so the Proton session,
-the version pin and the CLI quirks stay in one place. Standard library only.
+Source kinds (backup.toml):
+  files     (default) paths → one dated .tar.gz per run, skipped when nothing changed
+  postgres  pg_dump of a Docker Compose service → one dated .tar.gz per run
+  mirror    one folder, copied file by file to <remote>/<source>/; only new or changed files
+            go up, nothing is ever deleted on the Drive. For photos: too big to re-send nightly
+
+The Proton CLI is wrapped in proton_drive.py. Standard library only.
 """
 
 import argparse
@@ -22,17 +29,18 @@ import sqlite3
 import subprocess
 import sys
 import tarfile
-import time
 import tomllib
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+from proton_drive import Drive, protect_session_files
+
 SQLITE_MAGIC = b"SQLite format 3\x00"
 DEFAULT_EXCLUDE = ["*.log", "*-wal", "*-shm", "*-journal", "*.tmp", "*.part"]
 MAX_STAGE_AGE = timedelta(hours=6)
-WAIT_FOR = "velotheque-backup.service"
-WAIT_LIMIT = 2 * 3600
+MIRROR_BATCH = 200
+KINDS = {"files", "postgres", "mirror"}
 
 
 class BackupError(RuntimeError):
@@ -55,8 +63,33 @@ def parse_env(path: Path) -> dict[str, str]:
 @dataclass
 class Source:
     name: str
-    paths: list[str]
+    paths: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
+    kind: str = "files"
+    compose_dir: str = ""
+    service: str = "db"
+    exclude_table_data: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_toml(cls, raw: dict) -> "Source":
+        source = cls(
+            name=raw["name"],
+            paths=list(raw.get("paths", [])),
+            exclude=list(raw.get("exclude", [])),
+            kind=raw.get("kind", "files"),
+            compose_dir=raw.get("compose_dir", ""),
+            service=raw.get("service", "db"),
+            exclude_table_data=list(raw.get("exclude_table_data", [])),
+        )
+        if source.kind not in KINDS:
+            raise BackupError(f"{source.name}: unknown kind {source.kind!r}")
+        if source.kind == "postgres" and not source.compose_dir:
+            raise BackupError(f"{source.name}: a postgres source needs compose_dir")
+        if source.kind == "mirror" and len(source.paths) != 1:
+            raise BackupError(f"{source.name}: a mirror source takes exactly one folder in paths")
+        if source.kind != "postgres" and not source.paths:
+            raise BackupError(f"{source.name}: no paths")
+        return source
 
 
 @dataclass
@@ -67,10 +100,9 @@ class Config:
     owner_home: Path
     keep_daily: int = 14
     keep_weekly: int = 8
-    backup_user: str = "velobackup"
+    backup_user: str = "joanpibackup"
     proton_bin: str = "proton-drive"
     proton_version: str = ""
-    proton_lib: str = "/usr/local/lib/velotheque-backup"
 
     @classmethod
     def load(cls, config_path: Path, ops_env: Path, proton_env: Path) -> "Config":
@@ -83,7 +115,7 @@ class Config:
         remote = raw["remote"].rstrip("/")
         if remote.count("/") < 2:
             raise BackupError(f"remote {remote!r} needs at least two levels, e.g. /my-files/Backups/joanpi")
-        sources = [Source(s["name"], list(s["paths"]), list(s.get("exclude", []))) for s in raw["source"]]
+        sources = [Source.from_toml(s) for s in raw["source"]]
         names = [s.name for s in sources]
         if len(set(names)) != len(names) or not all(re.fullmatch(r"[a-z0-9-]+", n) for n in names):
             raise BackupError("source names must be unique and use a-z, 0-9 and -")
@@ -94,10 +126,9 @@ class Config:
             owner_home=Path(ops.get("OWNER_HOME", "~")).expanduser(),
             keep_daily=int(raw.get("keep_daily", 14)),
             keep_weekly=int(raw.get("keep_weekly", 8)),
-            backup_user=proton.get("BACKUP_USER", "velobackup"),
+            backup_user=proton.get("BACKUP_USER", "joanpibackup"),
             proton_bin=proton.get("PROTON_DRIVE_BIN", "proton-drive"),
             proton_version=proton.get("PROTON_DRIVE_VERSION", ""),
-            proton_lib=raw.get("proton_lib", "/usr/local/lib/velotheque-backup"),
         )
 
     @property
@@ -180,6 +211,10 @@ def expand(pattern: str, home: Path) -> list[Path]:
     return [Path(p) for p in sorted(glob.glob(pattern))]
 
 
+def home_path(path: str, home: Path) -> Path:
+    return home / path[2:] if path.startswith("~/") else Path(path)
+
+
 def collect(source: Source, home: Path) -> list[Path]:
     files: list[Path] = []
     patterns = DEFAULT_EXCLUDE + source.exclude
@@ -231,22 +266,118 @@ def stage_source(source: Source, home: Path, work: Path) -> dict:
     return {"tree": tree, "digest": tree_digest.hexdigest(), "bytes": total, "databases": databases}
 
 
+def compose(source: Source, home: Path, *args: str, stdin=None, stdout=None) -> None:
+    directory = home_path(source.compose_dir, home)
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "--project-directory", str(directory), *args],
+            stdin=stdin, stdout=stdout, stderr=subprocess.PIPE, timeout=3600,
+        )
+    except subprocess.TimeoutExpired:
+        raise BackupError(f"{source.name}: docker compose {args[0]} timed out")
+    if result.returncode:
+        err = result.stderr.decode(errors="replace").strip().splitlines()
+        raise BackupError(f"{source.name}: docker compose {' '.join(args[:3])} failed: {err[-1] if err else result.returncode}")
+
+
+def stage_postgres(source: Source, home: Path, work: Path) -> dict:
+    """pg_dump in custom format, checked with pg_restore --list before it counts."""
+    tree = work / source.name
+    shutil.rmtree(tree, ignore_errors=True)
+    tree.mkdir(parents=True)
+    dump = tree / f"{source.name}.dump"
+    excludes = [f"--exclude-table-data={t}" for t in source.exclude_table_data]
+    script = 'pg_dump --format=custom -U "$POSTGRES_USER" "$@" "$POSTGRES_DB"'
+    with dump.open("wb") as out:
+        compose(source, home, "exec", "-T", source.service, "sh", "-c", script, "pg_dump", *excludes, stdout=out)
+    with dump.open("rb") as inp:
+        compose(source, home, "exec", "-T", source.service, "pg_restore", "--list", stdin=inp, stdout=subprocess.DEVNULL)
+    return {"tree": tree, "digest": file_digest(dump), "bytes": dump.stat().st_size, "databases": [f"postgres:{source.service}"]}
+
+
+Snapshot = dict[str, tuple[int, int]]
+
+
+def scan_folder(root: Path, patterns: list[str]) -> Snapshot:
+    files: Snapshot = {}
+    for directory, dirnames, filenames in os.walk(root):
+        dirnames.sort()
+        for filename in filenames:
+            path = Path(directory) / filename
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink() or not path.is_file() or excluded(relative, patterns):
+                continue
+            stat = path.stat()
+            files[relative] = (stat.st_size, stat.st_mtime_ns)
+    return files
+
+
+def load_snapshot(path: Path) -> Snapshot:
+    snapshot: Snapshot = {}
+    if path.exists():
+        for line in path.read_text().splitlines():
+            relative, size, mtime = line.rsplit("\t", 2)
+            snapshot[relative] = (int(size), int(mtime))
+    return snapshot
+
+
+def save_snapshot(path: Path, snapshot: Snapshot) -> None:
+    partial = path.with_suffix(".part")
+    partial.write_text("".join(f"{rel}\t{size}\t{mtime}\n" for rel, (size, mtime) in sorted(snapshot.items())))
+    partial.replace(path)
+
+
+def mirror_record(config: Config, source: str) -> Path:
+    return config.state_dir / f"{source}.files.tsv"
+
+
+def link_or_copy(source: Path, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(source, target)
+    except OSError:
+        shutil.copy2(source, target)
+
+
+def stage_mirror(source: Source, config: Config) -> dict:
+    """Hard-link every new or changed file into upload-ready batch folders. Linking needs root
+    (the files aren't the backup user's), so it happens here; the upload only reads them."""
+    matches = expand(source.paths[0], config.owner_home)
+    if len(matches) != 1 or not matches[0].is_dir():
+        raise BackupError(f"{source.name}: {source.paths[0]} must match exactly one folder")
+    root = matches[0]
+    current = scan_folder(root, DEFAULT_EXCLUDE + source.exclude)
+    done = load_snapshot(mirror_record(config, source.name))
+    pending = sorted(rel for rel, meta in current.items() if done.get(rel) != meta)
+    _, nested = split_remote(config.remote)
+    batches = []
+    for start in range(0, len(pending), MIRROR_BATCH):
+        chunk = pending[start : start + MIRROR_BATCH]
+        folder = f"batch-{start // MIRROR_BATCH:05d}"
+        for rel in chunk:
+            link_or_copy(root / rel, config.out_dir.joinpath(source.name, folder, *nested, source.name, rel))
+        batches.append({"dir": folder, "files": {rel: list(current[rel]) for rel in chunk}})
+    return {"kind": "mirror", "total": len(current), "pending": len(pending), "batches": batches}
+
+
+def give_to(out_dir: Path, owner: tuple[int, int]) -> None:
+    """Folders and our own files go to the backup user. Hard links are left alone: chown on a
+    link changes the app's original file."""
+    os.chown(out_dir, *owner)
+    for directory, dirnames, filenames in os.walk(out_dir):
+        for d in dirnames:
+            os.chown(Path(directory) / d, *owner)
+        for f in filenames:
+            path = Path(directory) / f
+            if path.stat().st_nlink == 1:
+                os.chown(path, *owner)
+
+
 def make_archive(tree: Path, archive: Path) -> None:
     with tarfile.open(archive, "w:gz", compresslevel=6) as tar:
         for path in sorted(tree.rglob("*")):
             if path.is_file():
                 tar.add(path, arcname=path.relative_to(tree).as_posix(), recursive=False)
-
-
-def wait_for_other_backup(limit: int = WAIT_LIMIT, sleep=time.sleep) -> None:
-    waited = 0
-    while subprocess.run(["systemctl", "is-active", "--quiet", WAIT_FOR]).returncode == 0:
-        if waited >= limit:
-            raise BackupError(f"{WAIT_FOR} is still running after {limit // 60} min")
-        if waited == 0:
-            print(f"waiting for {WAIT_FOR} to finish (same Proton session)")
-        sleep(30)
-        waited += 30
 
 
 def stage(config: Config, now: datetime | None = None, owner: tuple[int, int] | None = None) -> dict:
@@ -257,7 +388,15 @@ def stage(config: Config, now: datetime | None = None, owner: tuple[int, int] | 
     manifest = {"staged_at": now.isoformat(), "sources": {}}
     try:
         for source in config.sources:
-            staged = stage_source(source, config.owner_home, work)
+            if source.kind == "mirror":
+                entry = stage_mirror(source, config)
+                manifest["sources"][source.name] = entry
+                print(f"{source.name}: {entry['pending']} new or changed of {entry['total']} files staged")
+                continue
+            if source.kind == "postgres":
+                staged = stage_postgres(source, config.owner_home, work)
+            else:
+                staged = stage_source(source, config.owner_home, work)
             name = archive_name(source.name, now)
             make_archive(staged["tree"], config.out_dir / name)
             manifest["sources"][source.name] = {
@@ -271,8 +410,7 @@ def stage(config: Config, now: datetime | None = None, owner: tuple[int, int] | 
         shutil.rmtree(work, ignore_errors=True)
     (config.out_dir / "manifest.json").write_text(json.dumps(manifest, indent=1))
     if owner:
-        for path in [config.out_dir, *config.out_dir.iterdir()]:
-            os.chown(path, *owner)
+        give_to(config.out_dir, owner)
     return manifest
 
 
@@ -302,6 +440,9 @@ def upload(config: Config, drive, now: datetime | None = None) -> list[str]:
     root, nested = split_remote(config.remote)
     lines = []
     for name, entry in manifest["sources"].items():
+        if entry.get("kind") == "mirror":
+            lines.append(upload_mirror(config, drive, name, entry))
+            continue
         remote_dir = f"{config.remote}/{name}"
         try:
             names = drive.list_names(remote_dir)
@@ -335,6 +476,22 @@ def upload(config: Config, drive, now: datetime | None = None) -> list[str]:
     return lines
 
 
+def upload_mirror(config: Config, drive, name: str, entry: dict) -> str:
+    """Batch by batch, recording each one as done, so an interrupted first upload resumes."""
+    root, nested = split_remote(config.remote)
+    record = mirror_record(config, name)
+    done = load_snapshot(record)
+    sent = 0
+    for batch in entry["batches"]:
+        drive.upload(config.out_dir / name / batch["dir"] / nested[0], root, "skip")
+        done.update({rel: (meta[0], meta[1]) for rel, meta in batch["files"].items()})
+        save_snapshot(record, done)
+        sent += len(batch["files"])
+    if not sent:
+        return f"{name} unchanged ({entry['total']} files)"
+    return f"{name} {sent} new ({entry['total']} files)"
+
+
 def safe_members(tar: tarfile.TarFile) -> list[tarfile.TarInfo]:
     members = tar.getmembers()
     for m in members:
@@ -345,6 +502,15 @@ def safe_members(tar: tarfile.TarFile) -> list[tarfile.TarInfo]:
 
 def restore(config: Config, drive, source: str, archive: str | None = None) -> Path:
     remote_dir = f"{config.remote}/{source}"
+    kind = next((s.kind for s in config.sources if s.name == source), "files")
+    if kind == "mirror":
+        base = config.state_dir / "restore"
+        shutil.rmtree(base / source, ignore_errors=True)
+        base.mkdir(parents=True, exist_ok=True)
+        drive.download(remote_dir, base)
+        files = [p for p in (base / source).rglob("*") if p.is_file()]
+        print(f"{source}: {len(files)} files downloaded to {base / source}")
+        return base / source
     if archive is None:
         dated = sorted((archive_date(source, n), n) for n in drive.list_names(remote_dir) if archive_date(source, n))
         if not dated:
@@ -353,10 +519,7 @@ def restore(config: Config, drive, source: str, archive: str | None = None) -> P
     base = config.state_dir / "restore" / source
     shutil.rmtree(base, ignore_errors=True)
     base.mkdir(parents=True)
-    drive.run(
-        "filesystem", "download", "--json", "--file-conflict-strategy", "remove",
-        "--folder-conflict-strategy", "merge", f"{remote_dir}/{archive}", str(base),
-    )
+    drive.download(f"{remote_dir}/{archive}", base)
     unpacked = base / archive.removesuffix(".tar.gz")
     with tarfile.open(base / archive, "r:gz") as tar:
         members = safe_members(tar)
@@ -372,14 +535,17 @@ def restore(config: Config, drive, source: str, archive: str | None = None) -> P
         if check != "ok":
             raise BackupError(f"{db}: integrity check failed: {check}")
     print(f"{archive}: {len(members)} files, {len(databases)} database(s) pass the integrity check")
-    print(f"unpacked to {unpacked} (paths mirror the Pi's, from /)")
+    if kind == "postgres":
+        for dump in unpacked.glob("*.dump"):
+            print(f"pg_dump archive: {dump}")
+            print("  test it in a scratch database with the app's restore script (e.g. Vélothèque's scripts/restore-db.sh)")
+    else:
+        print(f"unpacked to {unpacked} (paths mirror the Pi's, from /)")
     return unpacked
 
 
-def proton_drive(config: Config):
-    sys.path.insert(0, config.proton_lib)
-    from proton_backup import Drive
-
+def proton_drive(config: Config) -> Drive:
+    protect_session_files(Path.home())
     return Drive(config.proton_bin)
 
 
@@ -397,7 +563,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="joanpi_backup.py")
     parser.add_argument("--config", type=Path, default=Path("/etc/joanpi/backup.toml"))
     parser.add_argument("--ops-env", type=Path, default=Path("/etc/joanpi/ops.env"))
-    parser.add_argument("--proton-env", type=Path, default=Path("/etc/velotheque/backup.env"))
+    parser.add_argument("--proton-env", type=Path, default=Path("/etc/joanpi/proton.env"))
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("stage")
     sub.add_parser("upload")
@@ -408,7 +574,6 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = Config.load(args.config, args.ops_env, args.proton_env)
         if args.cmd == "stage":
-            wait_for_other_backup()
             stage(config, owner=owner_ids(config.backup_user))
         elif args.cmd == "upload":
             lines = upload(config, proton_drive(config))
