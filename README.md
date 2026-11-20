@@ -177,8 +177,7 @@ Deploy keys are left out on purpose: they're quicker to regenerate than to prote
 
 ```sh
 joanpi-backup restore kiosk                # newest archive; or name one: kiosk-2026-11-05T0415Z.tar.gz
-joanpi-backup restore velotheque-db        # prints the path of the .dump it unpacked
-cd ~/velotheque && sudo scripts/restore-db.sh /var/lib/joanpi-backup/restore/velotheque-db/<archive>/velotheque-db.dump
+joanpi-backup restore velotheque-db        # prints the restore-test command to run next, with its path
 #   → "RESTORE TEST OK: row counts match the live database", then: sudo scripts/restore-db.sh --drop-scratch
 joanpi-backup restore velotheque-photos    # downloads the whole folder; slow, do it now and then
 ```

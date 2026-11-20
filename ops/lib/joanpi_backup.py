@@ -534,12 +534,15 @@ def restore(config: Config, drive, source: str, archive: str | None = None) -> P
             conn.close()
         if check != "ok":
             raise BackupError(f"{db}: integrity check failed: {check}")
-    print(f"{archive}: {len(members)} files, {len(databases)} database(s) pass the integrity check")
     if kind == "postgres":
+        spec = next(src for src in config.sources if src.name == source)
+        app_dir = home_path(spec.compose_dir, config.owner_home)
         for dump in unpacked.glob("*.dump"):
-            print(f"pg_dump archive: {dump}")
-            print("  test it in a scratch database with the app's restore script (e.g. Vélothèque's scripts/restore-db.sh)")
+            print(f"{archive}: pg_dump archive at {dump}")
+            print("restore test into a scratch database (if the app has scripts/restore-db.sh, as Vélothèque does):")
+            print(f"  cd {app_dir} && sudo scripts/restore-db.sh {dump}")
     else:
+        print(f"{archive}: {len(members)} files, {len(databases)} database(s) pass the integrity check")
         print(f"unpacked to {unpacked} (paths mirror the Pi's, from /)")
     return unpacked
 
